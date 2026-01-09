@@ -19,14 +19,12 @@ This module defines functions to compute the following seepage rates:
 ####################
 
 # Standard imports
-from time import time
 
 # Third party imports
 import numpy as np
 from scipy.optimize import fsolve
 
 # Internal imports
-import constants
 from uhc import get_rhc
 
 ####################
@@ -42,7 +40,7 @@ def q_exact(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
         lhs = aq_cond * rhc(psi_interface, aq_scale, aq_shape)
         rhs = cl_cond * (1 + (stage + psi_interface) / cl_th)
         return lhs - rhs
-
+        
     psi_interface_init = aq_scale
     x, _, ier, _ = fsolve(darcy, psi_interface_init, full_output=True)
     psi_interface = x[0] if ier == 1 else np.nan
@@ -77,8 +75,14 @@ def q0_asymptote_negl(cl_cond: float, cl_th: float, aq_cond: float,
 def q0_asymptote_soft(cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
     
-    b, B = get_bB()
-    x = get_x()
+    if aq_para == 'vGM':
+        b = 0.5 * (5 * aq_shape - 1)
+        B = (1 - 1 / aq_shape)**2
+    elif aq_para == 'BCB':
+        b = 2 + 3 * aq_shape
+        B = 1
+
+    x = B**(-1/b) * cl_th * aq_cond / (aq_scale * cl_cond)
     q0 = aq_cond * x**-(b/(1+b))
     
     return q0
@@ -93,22 +97,39 @@ def q0_asymptote_hard(cl_cond: float, cl_th: float, aq_cond: float,
 def q0_approximate(cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
     
-    x, x_sh, b, B, xi = get_dless_parameters()
-
     if aq_para == 'vGM':
+
+        C1 = 1.1
+        C2 = 0.5
+        C3 = 1.0
+        C4 = 1.3
+
+        b = 0.5 * (5 * aq_shape - 1)
+        B = (1 - 1 / aq_shape)**2
+        xi = b / (1 + b)
+        x = B**(-1/b) * cl_th * aq_cond / (aq_scale * cl_cond)
+        x_sh = (aq_cond / cl_cond)**(1/xi)
         
-        a_ns = np.log(constants.C1 * x)
+        a_ns = np.log(C1 * aq_shape)
         q_ns = aq_cond * (1 + x**a_ns)**-(xi / a_ns)
         
-        a_sh = 0.5 * (constants.C2 + aq_shape)
+        a_sh = C2* (C3 + xi)
         q_sh = cl_cond * (1 + (x_sh / x)**a_sh)**(xi / a_sh)
         
-        s = 1 / (1 + (x_sh**0.5 / x)**constants.A)
+        s = 1 / (1 + (x_sh**0.5 / x)**C4)
         q0 = q_ns**(1-s) * q_sh**s
 
     elif aq_para == 'BCB':
 
-        a_sh = 0.5 * (constants.C2 + aq_shape)
+        C1 = 1.0
+
+        b = 2 + 3 * aq_shape
+        B = 1
+        xi = b / (1 + b)
+        x = B**(-1/b) * cl_th * aq_cond / (aq_scale * cl_cond)
+        x_sh = (aq_cond / cl_cond)**(1/xi)
+
+        a_sh = C1
         q_sh = cl_cond * (1 + (x_sh / x)**a_sh)**(xi / a_sh)
 
         q0 = max(aq_cond, q_sh)
