@@ -43,7 +43,8 @@ def q_exact(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
         
     psi_interface_init = aq_scale
     x, _, ier, _ = fsolve(darcy, psi_interface_init, full_output=True)
-    psi_interface = x[0] if ier == 1 else np.nan
+    #psi_interface = x[0] if ier == 1 else np.nan
+    psi_interface = x[0]
     q = cl_cond * (1 + (stage + psi_interface) / cl_th)
 
     return q
