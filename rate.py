@@ -95,6 +95,12 @@ def q0_asymptote_hard(cl_cond: float, cl_th: float, aq_cond: float,
     
     return q0
 
+def q0_negl_to_soft(aq_cond, x, xi, a_ns):
+    return aq_cond * (1 + x**a_ns)**(-xi/a_ns)
+
+def q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh):
+    return cl_cond * (1 + (x_sh / x)**a_sh)**(xi / a_sh)
+
 def q0_approximate(cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
     
@@ -112,13 +118,13 @@ def q0_approximate(cl_cond: float, cl_th: float, aq_cond: float,
         x_sh = (aq_cond / cl_cond)**(1/xi)
         
         a_ns = np.log(C1 * aq_shape)
-        q_ns = aq_cond * (1 + x**a_ns)**-(xi / a_ns)
+        q0_ns = q0_negl_to_soft(aq_cond, x, xi, a_ns)
         
         a_sh = C2* (C3 + xi)
-        q_sh = cl_cond * (1 + (x_sh / x)**a_sh)**(xi / a_sh)
+        q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
         
         s = 1 / (1 + (x_sh**0.5 / x)**C4)
-        q0 = q_ns**(1-s) * q_sh**s
+        q0 = q0_ns**(1-s) * q0_sh**s
 
     elif aq_para == 'BCB':
 
@@ -131,9 +137,9 @@ def q0_approximate(cl_cond: float, cl_th: float, aq_cond: float,
         x_sh = (aq_cond / cl_cond)**(1/xi)
 
         a_sh = C1
-        q_sh = cl_cond * (1 + (x_sh / x)**a_sh)**(xi / a_sh)
+        q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
 
-        q0 = max(aq_cond, q_sh)
+        q0 = max(aq_cond, q0_sh)
 
     return q0
 
