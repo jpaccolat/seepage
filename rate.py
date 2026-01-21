@@ -101,45 +101,53 @@ def q0_negl_to_soft(aq_cond, x, xi, a_ns):
 def q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh):
     return cl_cond * (1 + (x_sh / x)**a_sh)**(xi / a_sh)
 
+def q0_approximate_vGM(cl_cond: float, cl_th: float, aq_cond: float,
+             aq_scale: float, aq_shape: float, C_NSH: float,
+             C_NS_1=-0.3850, C_NS_2=0.2056, C_NS_3=0.5818, C_SH_1=0.4633,
+             C_SH_2=0.5396):
+
+    b = 0.5 * (5 * aq_shape - 1)
+    B = (1 - 1 / aq_shape)**2
+
+    xi = b / (1 + b)
+    x = B**(-1/b) * cl_th * aq_cond / (aq_scale * cl_cond)
+    x_sh = (aq_cond / cl_cond)**(1/xi)
+
+    a_ns = (C_NS_1 + C_NS_2 * b)**C_NS_3
+    q0_ns = q0_negl_to_soft(aq_cond, x, xi, a_ns)
+    
+    a_sh = C_SH_1 + C_SH_2 * xi
+    q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
+
+    s = 1 / (1 + (x_sh**0.5 / x)**C_NSH)
+    q0 = q0_ns**(1-s) * q0_sh**s
+
+    return q0
+
+def q0_approximate_BCB(cl_cond: float, cl_th: float, aq_cond: float,
+             aq_scale: float, aq_shape: float, C_SH_1=0.4633, C_SH_2=0.5396):
+
+    b = 2 + 3 * aq_shape
+    B = 1
+
+    xi = b / (1 + b)
+    x = B**(-1/b) * cl_th * aq_cond / (aq_scale * cl_cond)
+    x_sh = (aq_cond / cl_cond)**(1/xi)
+
+    a_sh = C_SH_1 + C_SH_2 * xi
+    q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
+
+    q0 = max(aq_cond, q0_sh)
+
+    return q0
+
 def q0_approximate(cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
     
     if aq_para == 'vGM':
-
-        C1 = 1.1
-        C2 = 0.5
-        C3 = 1.0
-        C4 = 1.3
-
-        b = 0.5 * (5 * aq_shape - 1)
-        B = (1 - 1 / aq_shape)**2
-        xi = b / (1 + b)
-        x = B**(-1/b) * cl_th * aq_cond / (aq_scale * cl_cond)
-        x_sh = (aq_cond / cl_cond)**(1/xi)
-        
-        a_ns = np.log(C1 * aq_shape)
-        q0_ns = q0_negl_to_soft(aq_cond, x, xi, a_ns)
-        
-        a_sh = C2* (C3 + xi)
-        q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
-        
-        s = 1 / (1 + (x_sh**0.5 / x)**C4)
-        q0 = q0_ns**(1-s) * q0_sh**s
-
+        q0 = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
     elif aq_para == 'BCB':
-
-        C1 = 1.0
-
-        b = 2 + 3 * aq_shape
-        B = 1
-        xi = b / (1 + b)
-        x = B**(-1/b) * cl_th * aq_cond / (aq_scale * cl_cond)
-        x_sh = (aq_cond / cl_cond)**(1/xi)
-
-        a_sh = C1
-        q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
-
-        q0 = max(aq_cond, q0_sh)
+        q0 = q0_approximate_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
 
     return q0
 
