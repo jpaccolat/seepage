@@ -33,6 +33,26 @@ from uhc import get_rhc
 
 def q_exact(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
+    """
+    Compute exact disconnected seepage rate by solving the unsaturated Darcy 
+    equation.
+
+    Parameters:
+    stage (float)
+        water depth in the river [L].
+    cl_cond (float):
+        Hydraulic conductivity of the clogging layer [L/T].
+    cl_th (float):
+        Thickness of the clogging layer [L].
+    aq_cond (float)
+        Hydraulic conductivity of the aquifer [L/T].
+    aq_scale (float)
+        Scale parameter of the aquifer [L].
+    aq_shape (float)
+        Shape parameter of the aquifer [-].
+    aq_para (str)
+        Unsaturated hydraulic conductivity parametrization.
+    """
     
     rhc = get_rhc(aq_para)
     
@@ -66,7 +86,7 @@ def q_linear(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
     
     return q
 
-def q0_asymptote_negl(cl_cond: float, cl_th: float, aq_cond: float,
+def q0_asymptote_negl(cl_cond: float,  cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
     
     q0 = aq_cond
@@ -137,25 +157,26 @@ def q0_approximate_BCB(cl_cond: float, cl_th: float, aq_cond: float,
     a_sh = C_SH_1 + C_SH_2 * xi
     q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
 
-    q0 = max(aq_cond, q0_sh)
+    q0 = min(aq_cond, q0_sh)
 
     return q0
 
 def q0_approximate(cl_cond: float, cl_th: float, aq_cond: float,
-             aq_scale: float, aq_shape: float, aq_para: str):
+             aq_scale: float, aq_shape: float, aq_para: str, C_NSH=None):
     
     if aq_para == 'vGM':
-        q0 = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
+        q0 = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
+                                C_NSH=C_NSH)
     elif aq_para == 'BCB':
         q0 = q0_approximate_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
 
     return q0
 
 def q_approximate(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
-             aq_scale: float, aq_shape: float, aq_para: str):
+             aq_scale: float, aq_shape: float, aq_para: str, C_NSH=None):
 
     q0 = q0_approximate(cl_cond=cl_cond, cl_th=cl_th, aq_cond=aq_cond,
-            aq_scale=aq_scale, aq_shape=aq_shape, aq_para=aq_para)
+            aq_scale=aq_scale, aq_shape=aq_shape, aq_para=aq_para, C_NSH=C_NSH)
     q = q0 + stage / cl_th * cl_cond
 
     return q

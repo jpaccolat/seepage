@@ -1,20 +1,18 @@
 #!/usr/bin/env python
 
-"""Profile module.
+"""Utilities."""
 
-This module defines seepage profiles which consists of:
- - stage (SW stage)
- - cl_cond (clogging conductivity)
- - cl_th (clogging thickness)
- - aq_cond (aquifer conductivity)
- - aq_shape (aquifer unsaturated shape parameter)
- - aq_scale (aquifer unsaturated scale parameter)
- - aq_para (aquifer unsaturated parametrization function)
+####################
+# Libraries        #
+####################
 
-The module contains functions to obtaine profile properties, e.g., scaling exponent, clogging regime, x-value,...
+# Standard imports
+import functools
+import time
 
-The module contains functions to generate profiles randomly or on a regular grid.
-"""
+####################
+# Functions        #
+####################
 
 def get_generalized_shape_parameters(aq_shape, aq_para):
 
@@ -36,3 +34,14 @@ def get_Dless_parameters(cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para):
     x_sh = (aq_cond / cl_cond)**(1/xi)
 
     return b, B, xi, x, x_sh
+
+def timer(func):
+    @functools.wraps(func)
+    def wrapper_timer(*args, **kwargs):
+        tic = time.perf_counter()
+        value = func(*args, **kwargs)
+        toc = time.perf_counter()
+        elapsed_time = toc - tic
+        #print(f"Elapsed time: {elapsed_time:0.4f} seconds")
+        return value, elapsed_time
+    return wrapper_timer
