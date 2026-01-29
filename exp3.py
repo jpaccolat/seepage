@@ -32,20 +32,20 @@ from utils import timer
 # aquifer shape parameter
 SCA_b = 'lin'
 MIN_b = 2.1
-MAX_b = 10
-NUM_b = 7
+MAX_b = 14
+NUM_b = 20
 
 # dimensionless x ratio
 SCA_x = 'log'
 MIN_x = -1
 MAX_x = 12
-NUM_x = 50
+NUM_x = 80
 
 # hydraulic conductivity ratio
 SCA_cond_ratio = 'log'
 MIN_cond_ratio = 0.5
 MAX_cond_ratio = 6
-NUM_cond_ratio = 6
+NUM_cond_ratio = 30
 
 ####################
 # Functions        #
@@ -96,7 +96,8 @@ def compute_rates(args):
     df['aq_para'] = args.aq_para
 
     # append dataframe with dimensionless parameters
-    df['b'], df['B'], df['xi'], df['x'], df['xsh'] = get_Dless_parameters(
+    df['x'] = x
+    df['b'], df['B'], df['xi'], _, df['xsh'] = get_Dless_parameters(
                                     df['cl_cond'], df['cl_th'], df['aq_cond'],
                                     df['aq_scale'], df['aq_shape'],
                                     args.aq_para
