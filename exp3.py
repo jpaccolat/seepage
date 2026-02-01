@@ -139,7 +139,7 @@ def main():
                         'infiltrability space')
 
     parser.add_argument('--aq_para', type=str, required=True, help='vGM or BCB')
-    parser.add_argument('--C_NSH', type=float, default=3.,
+    parser.add_argument('--C_NSH', type=float, default=1.,
                         help='Ponderation exponent for vGM merging.')
     parser.add_argument('--output', type=str, help='Path to directory')
     parser.add_argument('--clean', default=False, const=True, nargs='?',

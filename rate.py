@@ -19,6 +19,7 @@ This module defines functions to compute the following seepage rates:
 ####################
 
 # Standard imports
+import time
 
 # Third party imports
 import numpy as np
@@ -174,11 +175,49 @@ def q0_approximate(cl_cond: float, cl_th: float, aq_cond: float,
 
 def q_approximate(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str, C_NSH=None):
+    
+    if aq_para == 'vGM':
+        q = q_approximate_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale,
+                              aq_shape, C_NSH=C_NSH)
+    elif aq_para == 'BCB':
+        q = q_approximate_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale,
+                              aq_shape)
 
-    q0 = q0_approximate(cl_cond=cl_cond, cl_th=cl_th, aq_cond=aq_cond,
-            aq_scale=aq_scale, aq_shape=aq_shape, aq_para=aq_para, C_NSH=C_NSH)
-    q = q0 + stage / cl_th * cl_cond
+    return q
 
+def q_approximate_vGM(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
+             aq_scale: float, aq_shape: float, C_NSH=1.):
+    
+    q0 = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
+                            C_NSH=C_NSH)
+    
+    b = 0.5 * (5 * aq_shape - 1)
+    s = q0 / cl_th * b / ((1 + b) * q0 / cl_cond - 1)
+    q = max(q0 + s * stage, cl_cond + cl_cond / cl_th * stage)
+
+    # hc = cl_th * (aq_cond / cl_cond - 1)
+    # A2 = cl_cond
+    # B2 = cl_cond / cl_th
+    # A1 = q0 - A2
+    # B1 = -A1 / hc
+    # hstar = A1 / (B1 + B2 - s)
+    # q = (A1 + B1 * stage) * np.exp(-stage/hstar) + (A2 + B2 * stage)
+
+    return q
+
+def q_approximate_BCB(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
+             aq_scale: float, aq_shape: float):
+
+    q0 = q0_approximate_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
+
+    b = 2 + 3 * aq_shape
+    s = q0 / cl_th * b / ((1 + b) * q0 / cl_cond - 1)
+    B = cl_cond / cl_th
+    A = s - B
+    hc = cl_th * (aq_cond / cl_cond - 1) - aq_scale
+    hstar = -hc / np.log(((aq_cond - q0) / hc - B) / A) 
+    q = q0 + (A * np.exp(-stage / hstar) + B) * stage
+    
     return q
 
 def q_modflow(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
@@ -187,3 +226,5 @@ def q_modflow(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
     q = cl_cond * (1 + stage / cl_th)
 
     return q
+
+
