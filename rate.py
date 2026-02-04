@@ -123,9 +123,8 @@ def q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh):
     return cl_cond * (1 + (x_sh / x)**a_sh)**(xi / a_sh)
 
 def q0_approximate_vGM(cl_cond: float, cl_th: float, aq_cond: float,
-             aq_scale: float, aq_shape: float, C_NSH: float,
-             C_NS_1=-0.3850, C_NS_2=0.2056, C_NS_3=0.5818, C_SH_1=0.4633,
-             C_SH_2=0.5396):
+             aq_scale: float, aq_shape: float, C_NS_1=-0.3850, C_NS_2=0.2056,
+             C_NS_3=0.5818, C_SH_1=0.4633, C_SH_2=0.5396):
 
     b = 0.5 * (5 * aq_shape - 1)
     B = (1 - 1 / aq_shape)**2
@@ -140,7 +139,9 @@ def q0_approximate_vGM(cl_cond: float, cl_th: float, aq_cond: float,
     a_sh = C_SH_1 + C_SH_2 * xi
     q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
 
-    s = 1 / (1 + (x_sh**0.5 / x)**C_NSH)
+    a_nsh = 1.05 + 0.25 * np.tanh(b - 6)
+    #a_nsh = 1.
+    s = 1 / (1 + (x_sh**0.5 / x)**a_nsh)
     q0 = q0_ns**(1-s) * q0_sh**s
 
     return q0
@@ -163,22 +164,21 @@ def q0_approximate_BCB(cl_cond: float, cl_th: float, aq_cond: float,
     return q0
 
 def q0_approximate(cl_cond: float, cl_th: float, aq_cond: float,
-             aq_scale: float, aq_shape: float, aq_para: str, C_NSH=None):
+             aq_scale: float, aq_shape: float, aq_para: str):
     
     if aq_para == 'vGM':
-        q0 = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
-                                C_NSH=C_NSH)
+        q0 = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
     elif aq_para == 'BCB':
         q0 = q0_approximate_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
 
     return q0
 
 def q_approximate(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
-             aq_scale: float, aq_shape: float, aq_para: str, C_NSH=None):
+             aq_scale: float, aq_shape: float, aq_para: str):
     
     if aq_para == 'vGM':
         q = q_approximate_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale,
-                              aq_shape, C_NSH=C_NSH)
+                              aq_shape)
     elif aq_para == 'BCB':
         q = q_approximate_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale,
                               aq_shape)
@@ -186,10 +186,9 @@ def q_approximate(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
     return q
 
 def q_approximate_vGM(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
-             aq_scale: float, aq_shape: float, C_NSH=1.):
+             aq_scale: float, aq_shape: float):
     
-    q0 = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
-                            C_NSH=C_NSH)
+    q0 = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
     
     b = 0.5 * (5 * aq_shape - 1)
     s = q0 / cl_th * b / ((1 + b) * q0 / cl_cond - 1)
