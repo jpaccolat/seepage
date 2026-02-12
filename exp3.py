@@ -19,11 +19,11 @@ import numpy as np
 import pandas as pd
 
 # Internal imports
-from rate import q0_exact
+from rate import q_exact_dis
 from rate import q0_negl_to_soft
 from rate import q0_soft_to_hard
 from utils import get_Dless_parameters
-q0_exact = np.vectorize(q0_exact)
+q_exact_dis = np.vectorize(q_exact_dis)
 
 ####################
 # Constants        #
@@ -155,8 +155,8 @@ def run(args):
                                     )
 
     # compute rates
-    df['q0_ex'] = q0_exact(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
-                           args.aq_para)
+    df['q0_ex'] = q_exact_dis(0., cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
+                              args.aq_para)
     df['q0_ap'] = q0_approximate(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
                                  args.aq_para, C_NSH=args.C_NSH)
     

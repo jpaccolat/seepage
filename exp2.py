@@ -34,12 +34,12 @@ from scipy.optimize import least_squares
 from tqdm import tqdm
 
 # Internal imports
-from rate import q0_exact
+from rate import q_exact_dis
 from rate import q0_negl_to_soft
 from rate import q0_soft_to_hard
 from rate import q0_approximate_vGM
 
-q0_exact = np.vectorize(q0_exact)
+q_exact_dis = np.vectorize(q_exact_dis)
 
 ####################
 # Constants        #
@@ -101,7 +101,8 @@ def fit_a_ns(args):
 
         # fit a_ns
         def fun_to_minimize(a_ns):
-            y_ex = q0_exact(cl_cond, cl_th, aq_cond, aq_scale, aq_shape[i], 'vGM')
+            y_ex = q_exact_dis(0., cl_cond, cl_th, aq_cond, aq_scale,
+                               aq_shape[i], 'vGM')
             y_ap = q0_negl_to_soft(aq_cond, x, xi, a_ns)
             return np.log10(y_ap / aq_cond) - np.log10(y_ex / aq_cond)
         res = least_squares(fun_to_minimize, x0=[1.], method='lm')
@@ -168,8 +169,8 @@ def fit_a_sh(args):
      
         # fit a_sh
         def fun_to_minimize(a_sh):
-            y_ex = q0_exact(cl_cond, cl_th, aq_cond, aq_scale, aq_shape[i],
-                            args.aq_para)
+            y_ex = q_exact_dis(0., cl_cond, cl_th, aq_cond, aq_scale,
+                               aq_shape[i], args.aq_para)
             y_ap = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
             return np.log10(y_ap / aq_cond) - np.log10(y_ex / aq_cond)
         res = least_squares(fun_to_minimize, x0=[1.2], method='lm')
@@ -222,7 +223,8 @@ def fit_a_nsh(args):
 
         # fit a_nsh
         def fun_to_minimize(a_nsh):
-            y_ex = q0_exact(cl_cond, cl_th, aq_cond, aq_scale, aq_shape[i], 'vGM')
+            y_ex = q_exact_dis(0., cl_cond, cl_th, aq_cond, aq_scale,
+                               aq_shape[i], 'vGM')
             y_ap = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale,
                                       aq_shape[i], a_nsh)
             return np.log10(y_ap / aq_cond) - np.log10(y_ex / aq_cond)

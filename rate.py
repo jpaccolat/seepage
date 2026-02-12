@@ -29,10 +29,16 @@ from scipy.optimize import fsolve
 from uhc import get_rhc
 
 ####################
-# Functions        #
+# Functions (Main) #
 ####################
 
-def q_exact(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
+def q_exact(stage: float, dis_WT:float, cl_cond: float, cl_th: float,
+            aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str):
+    
+
+    return 0.
+
+def q_exact_dis(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
     """
     Compute exact disconnected seepage rate by solving the unsaturated Darcy 
@@ -70,13 +76,36 @@ def q_exact(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
 
     return q
 
-def q0_exact(cl_cond: float, cl_th: float, aq_cond: float,
-             aq_scale: float, aq_shape: float, aq_para: str):
+def q_approx(stage: float, dis_WT:float, cl_cond: float, cl_th: float,
+             aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str):
     
-    q0 = q_exact(stage=0., cl_cond=cl_cond, cl_th=cl_th, aq_cond=aq_cond,
-            aq_scale=aq_scale, aq_shape=aq_shape, aq_para=aq_para)
-        
-    return q0
+    q1 = (stage + cl_th + dis_WT) / (cl_th / cl_cond + dis_WT / aq_cond)
+    q2 = q_approx_dis(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
+                       aq_para)
+    
+    return min(q1, q2)
+
+def q_approx_dis(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
+                  aq_scale: float, aq_shape: float, aq_para: str):
+    
+    if aq_para == 'vGM':
+        q = q_approximate_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale,
+                              aq_shape)
+    elif aq_para == 'BCB':
+        q = q_approximate_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale,
+                              aq_shape)
+
+    return q
+
+def q_modflow(stage: float, cl_cond: float, cl_th: float):
+
+    q = cl_cond * (1 + stage / cl_th)
+
+    return q
+
+####################
+# Functions (Utils)#
+####################
 
 def q0_asymptote_negl(cl_cond: float,  cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
@@ -154,16 +183,6 @@ def q0_approximate_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
 
     return q0
 
-def q0_approximate(cl_cond: float, cl_th: float, aq_cond: float,
-                   aq_scale: float, aq_shape: float, aq_para: str):
-    
-    if aq_para == 'vGM':
-        q0 = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
-    elif aq_para == 'BCB':
-        q0 = q0_approximate_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
-
-    return q0
-
 def q_approximate_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     
     q0 = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
@@ -188,23 +207,3 @@ def q_approximate_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
 
     return q
-
-def q_approximate(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
-                  aq_scale: float, aq_shape: float, aq_para: str):
-    
-    if aq_para == 'vGM':
-        q = q_approximate_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale,
-                              aq_shape)
-    elif aq_para == 'BCB':
-        q = q_approximate_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale,
-                              aq_shape)
-
-    return q
-
-def q_modflow(stage: float, cl_cond: float, cl_th: float):
-
-    q = cl_cond * (1 + stage / cl_th)
-
-    return q
-
-
