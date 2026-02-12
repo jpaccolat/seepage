@@ -24,6 +24,7 @@ import time
 # Third party imports
 import numpy as np
 from scipy.optimize import fsolve
+from scipy.integrate import solve_bvp
 
 # Internal imports
 from uhc import get_rhc
@@ -33,10 +34,46 @@ from uhc import get_rhc
 ####################
 
 def q_exact(stage: float, dis_WT:float, cl_cond: float, cl_th: float,
-            aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str):
+            aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str,
+            guess=0., max_nodes=1000, tol=1e-3):
     
+    """
+    Solve the steady state Richard's equation for given boundary conditions.
+    The solution is stored as a class attribute.
 
-    return 0.
+    Parameters
+    ----------
+    guess: float, optional
+        Initial guess for the infiltration rate in [m/s]. Default is 0.
+    max_nodes: int, optional
+        Maximal number of nodes. Default is 1000.
+    tol: float, optional
+        Tolerance of the BVP solver. Default is 1e-3.
+    """
+
+    rhc = get_rhc(aq_para)
+
+    def fun(x, y, p):
+
+        psi = -y[0]
+        cond = cl_cond * np.ones_like(psi)
+
+        idx = x > cl_th
+        cond[idx] = aq_cond * rhc(psi[idx], aq_scale, aq_shape)
+
+        return np.vstack([1 - p[0] / cond])
+
+    def bc(ya, yb, p):
+        return np.array([ya[0] - stage, yb[0]])
+
+    z = np.linspace(0, cl_th + dis_WT, 10)
+    y = np.zeros((1, z.size))
+    y[0, 0] = stage
+    y[0, -1] = 0.
+    
+    sol = solve_bvp(fun, bc, z, y, p=[guess], max_nodes=max_nodes, tol=tol)
+
+    return sol.p[0]
 
 def q_exact_dis(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
@@ -81,9 +118,16 @@ def q_approx(stage: float, dis_WT:float, cl_cond: float, cl_th: float,
     
     q1 = (stage + cl_th + dis_WT) / (cl_th / cl_cond + dis_WT / aq_cond)
     q2 = q_approx_dis(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
-                       aq_para)
+                      aq_para)
+    q = min(q1, q2)
     
-    return min(q1, q2)
+    # q0 = q_modflow(stage, cl_cond, cl_th)
+    # A = q0 - q_inf
+    # B = q_inf
+    # C = -A * cl_th / cl_cond / (1 - q0 / aq_cond)
+    # q = A * np.exp(-dis_WT / C) + B
+
+    return q
 
 def q_approx_dis(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
                   aq_scale: float, aq_shape: float, aq_para: str):
