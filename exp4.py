@@ -15,6 +15,9 @@ import argparse
 import json
 from itertools import product
 
+import warnings
+warnings.filterwarnings('ignore')
+
 # Third party imports
 import numpy as np
 import pandas as pd
@@ -112,11 +115,11 @@ def run(args):
         df_['rel_err_mf'] = (q_mf - q_ex_d) / q_ex_d
 
         # compute maximal rel. error (for a finite WT depth)
-        depth_dis = v3 * ((q_ex_d / v2 - 1) - v1) / (1 - q_ex_d / aq_cond)
+        depth_dis = (v3 * (q_ex_d / v2 - 1) - v1) / (1 - q_ex_d / aq_cond)
         for i in range(args.n_sample):
 
             if np.isnan(depth_dis[i]):
-                err = np.nan
+                df_.loc[i, 'rel_err_max'] = np.nan
                 continue
 
             w_sparse = np.linspace(0, 2 * depth_dis[i], 10)
@@ -128,9 +131,7 @@ def run(args):
             
             q_ap = q_approx(v1, w_dense, v2, v3, aq_cond[i], aq_scale[i],
                             aq_shape[i], args.aq_para)
-            err = max((q_ap - q_ex) / q_ex)
-            
-            df_.loc[i, 'rel_err_max'] = err
+            df_.loc[i, 'rel_err_max'] = max((q_ap - q_ex) / q_ex)
 
         df = pd.concat([df, df_], ignore_index=True)
 
