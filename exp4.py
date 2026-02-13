@@ -100,6 +100,11 @@ def run(args):
         df_['clogged'] = v2 < aq_cond
         
         idx = np.logical_and(df_['unsaturated'], df_['clogged'])
+        if idx.sum() == 0:
+            df_['rel_err_dis'] = np.nan
+            df_['rel_err_max'] = np.nan
+            df_['rel_err_mf'] = np.nan
+            continue
     
         # compute rel. error when fully disconnected
         q_ex_d = np.full(args.n_sample, np.nan, dtype=float)
