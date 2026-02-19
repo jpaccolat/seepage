@@ -42,32 +42,51 @@ SILT_alpha_std = 0.30
 # Functions        #
 ####################
 
-def get_sand(N):
+def get_sand(N, nmin=1):
     """Generate N samples of sandy soil."""
 
-    log_K = np.random.normal(loc=SAND_K_mean, scale=SAND_K_std, size=N)
-    log_n = np.random.normal(loc=SAND_n_mean, scale=SAND_n_std, size=N)
-    log_alpha = np.random.normal(loc=SAND_alpha_mean, scale=SAND_alpha_std,
-                                 size=N)
-    
     df = pd.DataFrame(columns=['K', 'hg', 'n'])
-    df['K'] = 1e-2 / (24 * 60 * 60) * 10**log_K
-    df['n'] = 10**log_n
-    df['hg'] = 1e-2 / 10**log_alpha
+
+    log_K = np.random.normal(loc=SAND_K_mean, scale=SAND_K_std, size=N)
+    log_alpha = np.random.normal(loc=SAND_alpha_mean, scale=SAND_alpha_std,
+                                size=N)
+    df['K'] = 1e-2 / (24 * 60 * 60) * 10**log_K[idx]
+    df['hg'] = 1e-2 / 10**log_alpha[idx]
+
+    larger_N = 2 * N
+    while True:
+        log_n = np.random.normal(loc=SAND_n_mean, scale=SAND_n_std,
+                                 size=larger_N)
+        idx = 10**log_n > nmin
+        if idx.sum() < N: 
+            larger_N *= 2
+        else:
+            break
+    df['n'] = 10**log_n[idx][:N]
 
     return df
 
-def get_silt(N):
+def get_silt(N, nmin=1):
     """Generate N samples of silty soil."""
 
+    df = pd.DataFrame(columns=['K', 'hg', 'n'])
+
     log_K = np.random.normal(loc=SILT_K_mean, scale=SILT_K_std, size=N)
-    log_n = np.random.normal(loc=SILT_n_mean, scale=SILT_n_std, size=N)
     log_alpha = np.random.normal(loc=SILT_alpha_mean, scale=SILT_alpha_std,
                                  size=N)
     
-    df = pd.DataFrame(columns=['K', 'hg', 'n'])
     df['K'] = 1e-2 / (24 * 60 * 60) * 10**log_K
-    df['n'] = 10**log_n
     df['hg'] = 1e-2 / 10**log_alpha
+
+    larger_N = 2 * N
+    while True:
+        log_n = np.random.normal(loc=SILT_n_mean, scale=SILT_n_std,
+                                 size=larger_N)
+        idx = 10**log_n > nmin
+        if idx.sum() < N: 
+            larger_N *= 2
+        else:
+            break
+    df['n'] = 10**log_n[idx][:N]
 
     return df 
