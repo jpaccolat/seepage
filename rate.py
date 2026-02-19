@@ -232,8 +232,10 @@ def q_approximate_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     q0 = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
     
     b = 0.5 * (5 * aq_shape - 1)
-    s = -cl_cond / cl_th * (q0 - cl_cond) / ((1+b) * q0 - cl_cond)
     hc = cl_th * (aq_cond / cl_cond - 1)
+
+    x = min(aq_cond, (1 + b) * q0)
+    s = -cl_cond / cl_th * (q0 - cl_cond) / (x - cl_cond)
     hstar =  (q0 - cl_cond) / (s * hc + q0 - cl_cond) * hc
     q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
 
