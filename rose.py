@@ -88,6 +88,7 @@ def get_hydraulic_conductivity(N, mean, std, bounds=[0, np.inf]):
         if idx.sum() < N: 
             larger_N *= 2
         else:
+            K = K[idx]
             break
     
     return K[:N]
@@ -103,6 +104,7 @@ def get_scale_parameter(N, mean, std, bounds=[0, np.inf]):
         if idx.sum() < N: 
             larger_N *= 2
         else:
+            hg = hg[idx]
             break
     
     return hg[:N]
@@ -118,6 +120,7 @@ def get_shape_parameter(N, mean, std, bounds=[1, np.inf]):
         if idx.sum() < N: 
             larger_N *= 2
         else:
+            n = n[idx]
             break
     
     return n[:N]
@@ -133,9 +136,9 @@ def sample_soils(name, N, bounds=None):
 
     p = get_gaussian_parameters(name)
 
-    K = get_hydraulic_conductivity(N, *p['K'], bounds['K'])
-    hg = get_scale_parameter(N, *p['alpha'], bounds['hg'])
-    n = get_shape_parameter(N, *p['n'], bounds['n'])
+    K = get_hydraulic_conductivity(N, *p['K'], bounds=bounds['K'])
+    hg = get_scale_parameter(N, *p['alpha'], bounds=bounds['hg'])
+    n = get_shape_parameter(N, *p['n'], bounds=bounds['n'])
 
     df = pd.DataFrame(np.array([K, hg, n]).T, index=range(N),
                       columns=['K', 'hg', 'n'])
