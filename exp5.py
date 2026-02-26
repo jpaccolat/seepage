@@ -140,6 +140,7 @@ def run(args):
     # compute transionaly diconnected seepage
     depth_dis = (cl_th[idx] * (q_ex_d / cl_cond[idx] - 1) - stage[idx]) \
                 / (1 - q_ex_d / aq_cond[idx])
+    depth_dis = depth_dis.values
 
     rel_err_max = np.full(shape=len(depth_dis), fill_value=np.nan)
     dt_ap_mean = np.full(shape=len(depth_dis), fill_value=np.nan)
