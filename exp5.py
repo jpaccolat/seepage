@@ -128,11 +128,9 @@ def run(args):
     q_ex_d, dt_ex_d = q_exact_dis(stage[idx], cl_cond[idx], cl_th[idx],
                                   aq_cond[idx], aq_scale[idx], aq_shape[idx],
                                   args.aq_para)
-    rel_err_dis = (q_ap_d - q_ex_d) / q_ex_d
-    rel_err_mf = (q_mf - q_ex_d) / q_ex_d
 
-    df.loc[idx, 'rel_err_mf'] = rel_err_mf
-    df.loc[idx, 'rel_err_dis'] = rel_err_dis
+    df.loc[idx, 'rel_err_mf'] = (q_mf - q_ex_d) / q_ex_d
+    df.loc[idx, 'rel_err_dis'] = (q_ap_d - q_ex_d) / q_ex_d
     df.loc[idx, 'dt_mf'] = dt_mf
     df.loc[idx, 'dt_ap_dis'] = dt_ap_d
     df.loc[idx, 'dt_ex_dis'] = dt_ex_d
