@@ -140,25 +140,19 @@ def run(args):
     # compute transionaly diconnected seepage
     depth_dis = (cl_th[idx] * (q_ex_d / cl_cond[idx] - 1) - stage[idx]) \
                 / (1 - q_ex_d / aq_cond[idx])
-    depth_dis = depth_dis.values
-
-    rel_err_max = np.full(shape=len(depth_dis), fill_value=np.nan)
-    dt_ap_mean = np.full(shape=len(depth_dis), fill_value=np.nan)
-    dt_ex_mean = np.full(shape=len(depth_dis), fill_value=np.nan)
-    van_cap_zone = np.zeros(len(depth_dis), dtype=bool)
 
     print('Start searching max errors')
-    for i in tqdm(range(len(depth_dis))):
+    for i in tqdm(df.loc[idx].index):
 
         if np.isnan(depth_dis[i]):
             print('Unresolved disconnected depth')
-            print(stage[idx][i], cl_cond[idx][i], cl_th[idx][i],
-                  aq_cond[idx][i], aq_scale[idx][i], aq_shape[idx][i])
+            print(stage[i], cl_cond[i], cl_th[i], aq_cond[i], aq_scale[i],
+                  aq_shape[i])
             continue
     
         if depth_dis[i] < 5e-2:
-            van_cap_zone[i] = True
-            rel_err_max[i] = rel_err_dis[i]
+            df.loc[i, 'van_cap_zone'] = True
+            df.loc[i, 'rel_err_max'] = df.loc[i, 'rel_err_dis']
             continue
 
         n_sparse = min(10, int(depth_dis[i] / 2e-2) + 1)
@@ -166,27 +160,22 @@ def run(args):
         n_dense = 10 * n_sparse
         w_dense = np.linspace(0, 2 * depth_dis[i], n_dense)
 
-        q_ex, dt_ex = q_exact(stage[idx][i], w_sparse, cl_cond[idx][i], cl_th[idx][i],
-                       aq_cond[idx][i], aq_scale[idx][i], aq_shape[idx][i],
-                       args.aq_para, max_nodes=100)
+        q_ex, dt_ex = q_exact(stage[i], w_sparse, cl_cond[i], cl_th[i], 
+                              aq_cond[i], aq_scale[i], aq_shape[i],
+                              args.aq_para, max_nodes=100)
         q_ex = np.interp(w_dense, w_sparse, q_ex)
 
-        q_ap, dt_ap = q_approx(stage[idx][i], w_dense, cl_cond[idx][i], cl_th[idx][i],
-                        aq_cond[idx][i], aq_scale[idx][i], aq_shape[idx][i],
-                        args.aq_para)
+        q_ap, dt_ap = q_approx(stage[i], w_dense, cl_cond[i], cl_th[i],
+                               aq_cond[i], aq_scale[i], aq_shape[i],
+                               args.aq_para)
         
-        rel_err_max[i] = max((q_ap - q_ex) / q_ex)
-        dt_ap_mean[i] = dt_ap.mean()
-        dt_ex_mean[i] = dt_ex.mean()
+        df.loc[i, 'rel_err_max'] = max((q_ap - q_ex) / q_ex)
+        df.loc[i, 'dt_ap_mean'] = dt_ap.mean()
+        df.loc[i, 'dt_ex_mean'] = dt_ex.mean()
 
         # print('Variability of trans. disc. comp. time:')
         # print(dt_ap.std() / dt_ap.mean())
         # print(dt_ex.std() / dt_ex.mean())
-
-    df.loc[idx, 'rel_err_max'] = rel_err_max
-    df.loc[idx, 'van_cap_zone'] = van_cap_zone
-    df.loc[idx, 'dt_ex_mean'] = dt_ex_mean
-    df.loc[idx, 'dt_ap_mean'] = dt_ap_mean
 
     df.to_csv(args.path / 'rel_error.csv', sep=',', index=True, header=True)
     print(f'Data stored in {args.path / 'rel_error.csv'}')
