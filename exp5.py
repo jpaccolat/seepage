@@ -140,6 +140,7 @@ def run(args):
     # compute transionaly diconnected seepage
     depth_dis = (cl_th[idx] * (q_ex_d / cl_cond[idx] - 1) - stage[idx]) \
                 / (1 - q_ex_d / aq_cond[idx])
+    depth_dis = depth_dis.values
 
     rel_err_max = np.full(shape=len(depth_dis), fill_value=np.nan)
     dt_ap_mean = np.full(shape=len(depth_dis), fill_value=np.nan)
@@ -178,9 +179,9 @@ def run(args):
         dt_ap_mean[i] = dt_ap.mean()
         dt_ex_mean[i] = dt_ex.mean()
 
-        # print('Variability of trans. disc. comp. time:')
-        # print(dt_ap.std() / dt_ap.mean())
-        # print(dt_ex.std() / dt_ex.mean())
+        print('Variability of trans. disc. comp. time:')
+        print(dt_ap.std() / dt_ap.mean())
+        print(dt_ex.std() / dt_ex.mean())
 
     df.loc[idx, 'rel_err_max'] = rel_err_max
     df.loc[idx, 'van_cap_zone'] = van_cap_zone
