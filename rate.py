@@ -33,7 +33,7 @@ from uhc import get_rhc
 # Functions #
 #############
 
-def q_exact(stage: float, dis_WT:float, cl_cond: float, cl_th: float,
+def q_exact(depth: float, stage: float, cl_cond: float, cl_th: float,
             aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str,
             guess=0., max_nodes=1000, tol=1e-3):
     
@@ -66,7 +66,7 @@ def q_exact(stage: float, dis_WT:float, cl_cond: float, cl_th: float,
     def bc(ya, yb, p):
         return np.array([ya[0] - stage, yb[0]])
 
-    z = np.linspace(0, cl_th + dis_WT, 10)
+    z = np.linspace(0, cl_th + depth, 10)
     y = np.zeros((1, z.size))
     y[0, 0] = stage
     y[0, -1] = 0.
@@ -115,10 +115,10 @@ def q_exact_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
     return q
 q_exact_full = np.vectorize(q_exact_full)
 
-def q_approx(stage: float, dis_WT:float, cl_cond: float, cl_th: float,
+def q_approx(depth: float, stage: float, cl_cond: float, cl_th: float,
              aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str):
     
-    q1 = (stage + cl_th + dis_WT) / (cl_th / cl_cond + dis_WT / aq_cond)
+    q1 = (stage + cl_th + depth) / (cl_th / cl_cond + depth / aq_cond)
     q2 = q_approx_full(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
                       aq_para)
     q = min(q1, q2)

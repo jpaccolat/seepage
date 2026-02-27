@@ -158,12 +158,12 @@ def run(args):
         n_dense = 10 * n_sparse
         w_dense = np.linspace(0, 2 * depth_dis[i], n_dense)
 
-        q_ex, dt_ex = q_exact(stage[i], w_sparse, cl_cond[i], cl_th[i], 
+        q_ex, dt_ex = q_exact(w_sparse, stage[i], cl_cond[i], cl_th[i], 
                               aq_cond[i], aq_scale[i], aq_shape[i],
                               args.aq_para, max_nodes=100)
         q_ex = np.interp(w_dense, w_sparse, q_ex)
 
-        q_ap, dt_ap = q_approx(stage[i], w_dense, cl_cond[i], cl_th[i],
+        q_ap, dt_ap = q_approx(w_dense, stage[i], cl_cond[i], cl_th[i],
                                aq_cond[i], aq_scale[i], aq_shape[i],
                                args.aq_para)
         

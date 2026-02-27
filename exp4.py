@@ -132,11 +132,11 @@ def run(args):
             n_dense = 10 * n_sparse
             w_dense = np.linspace(0, 2 * depth_dis[i], n_dense)
 
-            q_ex = q_exact(v1, w_sparse, v2, v3, aq_cond[i], aq_scale[i],
+            q_ex = q_exact(w_sparse, v1, v2, v3, aq_cond[i], aq_scale[i],
                            aq_shape[i], args.aq_para, max_nodes=100)
             q_ex = np.interp(w_dense, w_sparse, q_ex)
 
-            q_ap = q_approx(v1, w_dense, v2, v3, aq_cond[i], aq_scale[i],
+            q_ap = q_approx(w_dense, v1, v2, v3, aq_cond[i], aq_scale[i],
                             aq_shape[i], args.aq_para)
             df_.loc[i, 'rel_err_max'] = max((q_ap - q_ex) / q_ex)
 
