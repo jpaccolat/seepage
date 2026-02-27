@@ -74,7 +74,6 @@ def q_exact(depth: float, stage: float, cl_cond: float, cl_th: float,
     sol = solve_bvp(fun, bc, z, y, p=[guess], max_nodes=max_nodes, tol=tol)
 
     return sol.p[0]
-q_exact = np.vectorize(q_exact)
 
 def q_exact_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
@@ -113,18 +112,16 @@ def q_exact_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
     q = cl_cond * (1 + (stage + psi_interface) / cl_th)
 
     return q
-q_exact_full = np.vectorize(q_exact_full)
 
 def q_approx(depth: float, stage: float, cl_cond: float, cl_th: float,
              aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str):
     
     q1 = (stage + cl_th + depth) / (cl_th / cl_cond + depth / aq_cond)
     q2 = q_approx_full(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
-                      aq_para)
-    q = min(q1, q2)
+                       aq_para)
+    q = np.min([q1, q2], axis=0)
 
     return q
-q_approx = np.vectorize(q_approx)
 
 def q_approx_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
                   aq_scale: float, aq_shape: float, aq_para: str):
@@ -137,15 +134,14 @@ def q_approx_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
                               aq_shape)
         
     return q
-q_approx_full = np.vectorize(q_approx_full, excluded='aq_para')
 
 def q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     
     q0 = q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
-    
+
     b = 0.5 * (5 * aq_shape - 1)
     hc = cl_th * (aq_cond / cl_cond - 1)
-    x = min(0.99 * aq_cond, (1 + b) * q0)
+    x = np.min([0.99 * aq_cond, (1 + b) * q0], axis=0)
     s = -cl_cond / cl_th * (q0 - cl_cond) / (x - cl_cond)
     hstar =  (q0 - cl_cond) / (s * hc + q0 - cl_cond) * hc
     q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage

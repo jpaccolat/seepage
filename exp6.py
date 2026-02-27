@@ -13,9 +13,8 @@ Compute exact and approximate infiltrabilities.
 import pathlib
 import argparse
 from time import perf_counter
-
-#import warnings
-#warnings.filterwarnings('ignore')
+import warnings
+warnings.filterwarnings('ignore')
 
 # Third party imports
 import numpy as np
@@ -29,6 +28,9 @@ from rate import q_exact_full
 from rate import q_approx_full
 from rate import q_modflow
 import rose
+
+q_exact = np.vectorize(q_exact)
+q_exact_full = np.vectorize(q_exact_full)
 
 ####################
 # Constants        #
@@ -56,9 +58,9 @@ def draw_samples(args, N):
     }
 
     aq = rose.sample_soils(args.texture, N, bounds=bounds)
-    aq_cond = aq['K']
-    aq_scale = aq['hg']
-    aq_shape = aq['n']
+    aq_cond = aq['K'].values
+    aq_scale = aq['hg'].values
+    aq_shape = aq['n'].values
 
     if args.aq_para == 'BCB':
         b = 0.5 * (5 * aq_shape - 1)
@@ -73,7 +75,7 @@ def draw_samples(args, N):
     stage = np.random.uniform(low=MIN_stage, high=MAX_stage, size=N)
     depth = np.random.uniform(low=MIN_depth, high=MAX_depth, size=N)
 
-    return depth, stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
+    return depth, stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape
 
 def run(args):
     """Run experiment 4."""
@@ -125,7 +127,7 @@ def run(args):
             n_sample = 3 * args.base**(args.n_BVP-i)
 
             dt_ex = []
-            for k in tqdm(range(n_sample)):
+            for k in range(n_sample):
                 parameters = draw_samples(args, N)
 
                 t1 = perf_counter()
