@@ -26,16 +26,16 @@ from tqdm import tqdm
 # Internal imports
 from rate import q_exact
 from rate import q_approx
-from rate import q_exact_dis
-from rate import q_approx_dis
+from rate import q_exact_full
+from rate import q_approx_full
 from rate import q_modflow
 from utils import timer
 import rose
 
 q_exact = np.vectorize(timer(q_exact))
 q_approx = np.vectorize(timer(q_approx))
-q_exact_dis = np.vectorize(timer(q_exact_dis))
-q_approx_dis = np.vectorize(timer(q_approx_dis))
+q_exact_full = np.vectorize(timer(q_exact_full))
+q_approx_full = np.vectorize(timer(q_approx_full))
 q_modflow = np.vectorize(timer(q_modflow))
 
 ####################
@@ -122,10 +122,10 @@ def run(args):
     print(f'{idx.sum()} valid configurations')
 
     q_mf, dt_mf = q_modflow(stage[idx], cl_cond[idx], cl_th[idx])
-    q_ap_d, dt_ap_d = q_approx_dis(stage[idx], cl_cond[idx], cl_th[idx],
+    q_ap_d, dt_ap_d = q_approx_full(stage[idx], cl_cond[idx], cl_th[idx],
                                    aq_cond[idx], aq_scale[idx], aq_shape[idx],
                                    args.aq_para)
-    q_ex_d, dt_ex_d = q_exact_dis(stage[idx], cl_cond[idx], cl_th[idx],
+    q_ex_d, dt_ex_d = q_exact_full(stage[idx], cl_cond[idx], cl_th[idx],
                                   aq_cond[idx], aq_scale[idx], aq_shape[idx],
                                   args.aq_para)
 

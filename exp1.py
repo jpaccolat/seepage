@@ -35,13 +35,11 @@ from scipy.interpolate import interp1d
 from scipy.optimize import fsolve
 
 # Internal imports
-from rate import q_exact_dis
+from rate import q_exact_full
 from rate import q0_asymptote_negl
 from rate import q0_asymptote_soft
 from rate import q0_asymptote_hard
 from utils import get_Dless_parameters
-
-q_exact_dis = np.vectorize(q_exact_dis)
 
 ####################
 # Constants        #
@@ -121,7 +119,7 @@ def compute_rates(args):
                                     )
 
     # compute rates
-    df['q_exact_dis'] = q_exact_dis(0., cl_cond, cl_th, aq_cond, aq_scale,
+    df['q_exact_full'] = q_exact_full(0., cl_cond, cl_th, aq_cond, aq_scale,
                                     aq_shape, args.aq_para)
     df['q0_asymptote_negl'] = q0_asymptote_negl(cl_cond, cl_th, aq_cond,
                                                 aq_scale, aq_shape,
@@ -154,7 +152,7 @@ def compute_max_slopes(args, df_rates):
 
     for i, (v1, v2) in enumerate(product(cl_cond, b)):
         df_cut = df_rates[(df_rates['cl_cond'] == v1) & (df_rates['b'] == v2)]
-        grad = np.gradient(np.log10(df_cut['q_exact_dis'] / df_cut['aq_cond']),
+        grad = np.gradient(np.log10(df_cut['q_exact_full'] / df_cut['aq_cond']),
                             np.log10(df_cut['x']))
         max_slope = -np.nanmin(grad)
         df.loc[i] = [aq_cond / v1, v2, max_slope]
@@ -173,13 +171,13 @@ def get_negl_soft_interval(df_rates, v1, v2, eps):
     xns = 1 
 
     # relative error of negl. regime asymptote
-    en = (df_cut['q0_asymptote_negl'] - df_cut['q_exact_dis']) / df_cut['q_exact_dis']
+    en = (df_cut['q0_asymptote_negl'] - df_cut['q_exact_full']) / df_cut['q_exact_full']
     en[en < 0] = np.nan # discard opposite hierachy (outside of domain)
     fn = interp1d(np.log10(df_cut['x']), en - eps, fill_value='extrapolate')
     xn = 10**fsolve(fn, np.log10(xns))[0]
 
     # relative error of soft regime asymptote
-    es = (df_cut['q0_asymptote_soft'] - df_cut['q_exact_dis']) / df_cut['q_exact_dis']
+    es = (df_cut['q0_asymptote_soft'] - df_cut['q_exact_full']) / df_cut['q_exact_full']
     es[es < 0] = np.nan # discard opposite hierachy (outside of domain)
     fs = interp1d(np.log10(df_cut['x']), es - eps, fill_value='extrapolate')
     xs = 10**fsolve(fs, np.log10(xns))[0]
@@ -198,13 +196,13 @@ def get_soft_hard_interval(df_rates, v1, v2, eps):
     xsh = df_cut['xsh'].values[0]
 
     # relative error of negl. regime asymptote
-    es = (df_cut['q_exact_dis'] - df_cut['q0_asymptote_soft']) / df_cut['q_exact_dis']
+    es = (df_cut['q_exact_full'] - df_cut['q0_asymptote_soft']) / df_cut['q_exact_full']
     es[es < 0] = np.nan # discard opposite hierachy (outside of domain)
     fs = interp1d(np.log10(df_cut['x']), es - eps, fill_value='extrapolate')
     xs = 10**fsolve(fs, np.log10(xsh))[0]
 
     # relative error of soft regime asymptote
-    eh = (df_cut['q_exact_dis'] - df_cut['q0_asymptote_hard']) / df_cut['q_exact_dis']
+    eh = (df_cut['q_exact_full'] - df_cut['q0_asymptote_hard']) / df_cut['q_exact_full']
     eh[eh < 0] = np.nan # discard opposite hierachy (outside of domain)
     fh = interp1d(np.log10(df_cut['x']), eh - eps, fill_value='extrapolate')
     xh = 10**fsolve(fh, np.log10(xsh))[0]

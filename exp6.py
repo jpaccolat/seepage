@@ -25,15 +25,15 @@ from tqdm import tqdm
 # Internal imports
 from rate import q_exact
 from rate import q_approx
-from rate import q_exact_dis
-from rate import q_approx_dis
+from rate import q_exact_full
+from rate import q_approx_full
 from rate import q_modflow
 import rose
 
 q_exact = np.vectorize(q_exact)
 q_approx = np.vectorize(q_approx)
-q_exact_dis = np.vectorize(q_exact_dis)
-q_approx_dis = np.vectorize(q_approx_dis)
+q_exact_full = np.vectorize(q_exact_full)
+q_approx_full = np.vectorize(q_approx_full)
 q_modflow = np.vectorize(q_modflow)
 
 ####################
@@ -97,9 +97,9 @@ def run(args):
             t1 = perf_counter()
             _ = q_modflow(*parameters[:3])
             t2 = perf_counter()
-            _ = q_approx_dis(*parameters, args.aq_para)
+            _ = q_approx_full(*parameters, args.aq_para)
             t3 = perf_counter()
-            _ = q_exact_dis(*parameters, args.aq_para)
+            _ = q_exact_full(*parameters, args.aq_para)
             t4 = perf_counter()
 
             dt_mf.append((t2 - t1) / N)

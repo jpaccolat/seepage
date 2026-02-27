@@ -29,9 +29,9 @@ from scipy.integrate import solve_bvp
 # Internal imports
 from uhc import get_rhc
 
-####################
-# Functions (Main) #
-####################
+#############
+# Functions #
+#############
 
 def q_exact(stage: float, dis_WT:float, cl_cond: float, cl_th: float,
             aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str,
@@ -74,8 +74,9 @@ def q_exact(stage: float, dis_WT:float, cl_cond: float, cl_th: float,
     sol = solve_bvp(fun, bc, z, y, p=[guess], max_nodes=max_nodes, tol=tol)
 
     return sol.p[0]
+q_exact = np.vectorize(q_exact)
 
-def q_exact_dis(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
+def q_exact_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
     """
     Compute exact disconnected seepage rate by solving the unsaturated Darcy 
@@ -112,44 +113,110 @@ def q_exact_dis(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
     q = cl_cond * (1 + (stage + psi_interface) / cl_th)
 
     return q
+q_exact_full = np.vectorize(q_exact_full)
 
 def q_approx(stage: float, dis_WT:float, cl_cond: float, cl_th: float,
              aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str):
     
     q1 = (stage + cl_th + dis_WT) / (cl_th / cl_cond + dis_WT / aq_cond)
-    q2 = q_approx_dis(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
+    q2 = q_approx_full(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
                       aq_para)
     q = min(q1, q2)
-    
-    # q0 = q_modflow(stage, cl_cond, cl_th)
-    # A = q0 - q_inf
-    # B = q_inf
-    # C = -A * cl_th / cl_cond / (1 - q0 / aq_cond)
-    # q = A * np.exp(-dis_WT / C) + B
 
     return q
+q_approx = np.vectorize(q_approx)
 
-def q_approx_dis(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
+def q_approx_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
                   aq_scale: float, aq_shape: float, aq_para: str):
     
     if aq_para == 'vGM':
-        q = q_approximate_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale,
+        q = q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale,
                               aq_shape)
     elif aq_para == 'BCB':
-        q = q_approximate_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale,
+        q = q_approx_full_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale,
                               aq_shape)
+        
+    return q
+q_approx_full = np.vectorize(q_approx_full, excluded='aq_para')
+
+def q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
+    
+    q0 = q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
+    
+    b = 0.5 * (5 * aq_shape - 1)
+    hc = cl_th * (aq_cond / cl_cond - 1)
+    x = min(0.99 * aq_cond, (1 + b) * q0)
+    s = -cl_cond / cl_th * (q0 - cl_cond) / (x - cl_cond)
+    hstar =  (q0 - cl_cond) / (s * hc + q0 - cl_cond) * hc
+    q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
 
     return q
+
+def q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape, 
+                       C_NS_1=-0.3850, C_NS_2=0.2056, C_NS_3=0.5818,
+                       C_SH_1=0.4633, C_SH_2=0.5396, C_NSH_1=1.05, C_NSH_2=0.25,
+                       C_NSH_3=6):
+
+    b = 0.5 * (5 * aq_shape - 1)
+    B = (1 - 1 / aq_shape)**2
+
+    xi = b / (1 + b)
+    x = B**(-1/b) * cl_th * aq_cond / (aq_scale * cl_cond)
+    x_sh = (aq_cond / cl_cond)**(1/xi)
+
+    a_ns = (C_NS_1 + C_NS_2 * b)**C_NS_3
+    q0_ns = q0_negl_to_soft(aq_cond, x, xi, a_ns)
+    
+    a_sh = C_SH_1 + C_SH_2 * xi
+    q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
+
+    a_nsh = C_NSH_1 + C_NSH_2 * np.tanh(b - C_NSH_3)
+    s = 1 / (1 + (x_sh**0.5 / x)**a_nsh)
+    q0 = q0_ns**(1-s) * q0_sh**s
+
+    return q0
+
+def q_approx_full_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
+
+    q0 = q0_approx_full_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
+
+    b = 2 + 3 * aq_shape
+    s = -cl_cond / cl_th * (q0 - cl_cond) / ((1+b) * q0 - cl_cond)
+    hc = cl_th * (aq_cond / cl_cond - 1) - aq_scale
+    cl_cond_cor = cl_cond * (1 + aq_scale / cl_th) 
+    hstar =  (q0 - cl_cond_cor) / (s * hc + q0 - cl_cond_cor) * hc
+    q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
+
+    return q
+
+def q0_approx_full_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
+                       C_SH_1=0.4633, C_SH_2=0.5396):
+
+    b = 2 + 3 * aq_shape
+    B = 1
+
+    xi = b / (1 + b)
+    x = B**(-1/b) * cl_th * aq_cond / (aq_scale * cl_cond)
+    x_sh = (aq_cond / cl_cond)**(1/xi)
+
+    a_sh = C_SH_1 + C_SH_2 * xi
+    q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
+
+    q0 = min(aq_cond, q0_sh)
+
+    return q0
+
+def q0_negl_to_soft(aq_cond, x, xi, a_ns):
+    return aq_cond * (1 + x**a_ns)**(-xi/a_ns)
+
+def q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh):
+    return cl_cond * (1 + (x_sh / x)**a_sh)**(xi / a_sh)
 
 def q_modflow(stage: float, cl_cond: float, cl_th: float):
 
     q = cl_cond * (1 + stage / cl_th)
 
     return q
-
-####################
-# Functions (Utils)#
-####################
 
 def q0_asymptote_negl(cl_cond: float,  cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
@@ -179,76 +246,3 @@ def q0_asymptote_hard(cl_cond: float, cl_th: float, aq_cond: float,
     q0 = cl_cond
     
     return q0
-
-def q0_negl_to_soft(aq_cond, x, xi, a_ns):
-    return aq_cond * (1 + x**a_ns)**(-xi/a_ns)
-
-def q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh):
-    return cl_cond * (1 + (x_sh / x)**a_sh)**(xi / a_sh)
-
-def q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape, 
-                       C_NS_1=-0.3850, C_NS_2=0.2056, C_NS_3=0.5818,
-                       C_SH_1=0.4633, C_SH_2=0.5396, C_NSH_1=1.05, C_NSH_2=0.25,
-                       C_NSH_3=6):
-
-    b = 0.5 * (5 * aq_shape - 1)
-    B = (1 - 1 / aq_shape)**2
-
-    xi = b / (1 + b)
-    x = B**(-1/b) * cl_th * aq_cond / (aq_scale * cl_cond)
-    x_sh = (aq_cond / cl_cond)**(1/xi)
-
-    a_ns = (C_NS_1 + C_NS_2 * b)**C_NS_3
-    q0_ns = q0_negl_to_soft(aq_cond, x, xi, a_ns)
-    
-    a_sh = C_SH_1 + C_SH_2 * xi
-    q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
-
-    a_nsh = C_NSH_1 + C_NSH_2 * np.tanh(b - C_NSH_3)
-    s = 1 / (1 + (x_sh**0.5 / x)**a_nsh)
-    q0 = q0_ns**(1-s) * q0_sh**s
-
-    return q0
-
-def q0_approximate_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
-                       C_SH_1=0.4633, C_SH_2=0.5396):
-
-    b = 2 + 3 * aq_shape
-    B = 1
-
-    xi = b / (1 + b)
-    x = B**(-1/b) * cl_th * aq_cond / (aq_scale * cl_cond)
-    x_sh = (aq_cond / cl_cond)**(1/xi)
-
-    a_sh = C_SH_1 + C_SH_2 * xi
-    q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
-
-    q0 = min(aq_cond, q0_sh)
-
-    return q0
-
-def q_approximate_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
-    
-    q0 = q0_approximate_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
-    
-    b = 0.5 * (5 * aq_shape - 1)
-    hc = cl_th * (aq_cond / cl_cond - 1)
-    x = min(0.99 * aq_cond, (1 + b) * q0)
-    s = -cl_cond / cl_th * (q0 - cl_cond) / (x - cl_cond)
-    hstar =  (q0 - cl_cond) / (s * hc + q0 - cl_cond) * hc
-    q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
-
-    return q
-
-def q_approximate_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
-
-    q0 = q0_approximate_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
-
-    b = 2 + 3 * aq_shape
-    s = -cl_cond / cl_th * (q0 - cl_cond) / ((1+b) * q0 - cl_cond)
-    hc = cl_th * (aq_cond / cl_cond - 1) - aq_scale
-    cl_cond_cor = cl_cond * (1 + aq_scale / cl_th) 
-    hstar =  (q0 - cl_cond_cor) / (s * hc + q0 - cl_cond_cor) * hc
-    q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
-
-    return q

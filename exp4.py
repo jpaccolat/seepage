@@ -26,22 +26,17 @@ from tqdm import tqdm
 # Internal imports
 from rate import q_exact
 from rate import q_approx
-from rate import q_exact_dis
-from rate import q_approx_dis
+from rate import q_exact_full
+from rate import q_approx_full
 from rate import q_modflow
-import rosetta
-
-q_exact = np.vectorize(q_exact)
-q_approx = np.vectorize(q_approx)
-q_exact_dis = np.vectorize(q_exact_dis)
-q_approx_dis = np.vectorize(q_approx_dis)
+import rose
 
 ####################
 # Constants        #
 ####################
 
 LIST_stage = [0., 0.2, 1.0, 2.0]
-LIST_cl_cond = [1e-8, 1e-6]
+LIST_cl_cond = [1e-8]
 LIST_cl_th = [0.1, 1.]
 
 ####################
@@ -51,9 +46,9 @@ LIST_cl_th = [0.1, 1.]
 def draw_samples(args):
 
     if args.texture == 'SAND':
-        aq = rosetta.get_sand(args.n_sample)
+        aq = rose.get_sand(args.n_sample)
     elif args.texture == 'SILT':
-        aq = rosetta.get_silt(args.n_sample)
+        aq = rose.get_silt(args.n_sample)
     else:
         print('Texture must be SAND or SILT.')
 
@@ -78,10 +73,10 @@ def run(args):
     df = pd.DataFrame(columns=['stage', 'cl_cond', 'cl_th', 'aq_cond',
                                'aq_scale', 'aq_shape', 'aq_para', 'unsaturated',
                                'clogged', 'rel_err_dis', 'rel_err_mf',
-                               'rel_err_max'])
+                               'rel_err_max', 'vvz'])
     
     for v1, v2, v3 in tqdm(product(LIST_stage, LIST_cl_cond, LIST_cl_th)):
-
+        
         df_ = pd.DataFrame(index=range(args.n_sample))
         df_['aq_cond'] = aq_cond
         df_['aq_scale'] = aq_scale
@@ -90,6 +85,7 @@ def run(args):
         df_['stage'] = v1
         df_['cl_cond'] = v2
         df_['cl_th'] = v3
+        df_['vvz'] = False
 
         # check unsaturated condition
         hc = v3 * (aq_cond / v2 - 1)
@@ -108,11 +104,10 @@ def run(args):
     
         # compute rel. error when fully disconnected
         q_ex_d = np.full(args.n_sample, np.nan, dtype=float)
-        q_ex_d[idx] = q_exact_dis(v1, v2, v3, aq_cond[idx], aq_scale[idx],
+        q_ex_d[idx] = q_exact_full(v1, v2, v3, aq_cond[idx], aq_scale[idx],
                                   aq_shape[idx], args.aq_para)
-        
         q_ap_d = np.full(args.n_sample, np.nan, dtype=float)
-        q_ap_d[idx] = q_approx_dis(v1, v2, v3, aq_cond[idx], aq_scale[idx],
+        q_ap_d[idx] = q_approx_full(v1, v2, v3, aq_cond[idx], aq_scale[idx],
                                    aq_shape[idx], args.aq_para)
         q_mf = q_modflow(v1, v2, v3)
 
@@ -127,13 +122,20 @@ def run(args):
                 df_.loc[i, 'rel_err_max'] = np.nan
                 continue
 
-            w_sparse = np.linspace(0, 2 * depth_dis[i], 10)
-            w_dense = np.linspace(0, 2 * depth_dis[i], 100)
+            if depth_dis[i] < 5e-2:
+                df_.loc[i, 'rel_err_max'] = np.nan
+                df_.loc[i, 'vvz'] = True 
+                continue
+
+            n_sparse = min(10, int(depth_dis[i] / 2e-2) + 1)
+            w_sparse = np.linspace(0, 2 * depth_dis[i], n_sparse)
+            n_dense = 10 * n_sparse
+            w_dense = np.linspace(0, 2 * depth_dis[i], n_dense)
 
             q_ex = q_exact(v1, w_sparse, v2, v3, aq_cond[i], aq_scale[i],
                            aq_shape[i], args.aq_para, max_nodes=100)
             q_ex = np.interp(w_dense, w_sparse, q_ex)
-            
+
             q_ap = q_approx(v1, w_dense, v2, v3, aq_cond[i], aq_scale[i],
                             aq_shape[i], args.aq_para)
             df_.loc[i, 'rel_err_max'] = max((q_ap - q_ex) / q_ex)
