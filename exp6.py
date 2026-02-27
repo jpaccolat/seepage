@@ -30,12 +30,6 @@ from rate import q_approx_full
 from rate import q_modflow
 import rose
 
-q_exact = np.vectorize(q_exact)
-q_approx = np.vectorize(q_approx)
-q_exact_full = np.vectorize(q_exact_full)
-q_approx_full = np.vectorize(q_approx_full)
-q_modflow = np.vectorize(q_modflow)
-
 ####################
 # Constants        #
 ####################
@@ -46,6 +40,8 @@ MIN_cl_th = 0
 MAX_cl_th = 3
 MIN_stage = 0
 MAX_stage = 5
+MIN_depth = 0
+MAX_depth = 1
 
 ####################
 # Functions        #
@@ -75,43 +71,71 @@ def draw_samples(args, N):
                                     size=N)
     cl_th = np.random.uniform(low=MIN_cl_th, high=MAX_cl_th, size=N)
     stage = np.random.uniform(low=MIN_stage, high=MAX_stage, size=N)
+    depth = np.random.uniform(low=MIN_depth, high=MAX_depth, size=N)
 
-    return stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape
+    return depth, stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
 
 def run(args):
     """Run experiment 4."""
 
-    df = pd.DataFrame(columns=['mf mean', 'mf std', 'ap mean', 'ap std',
-                               'ex mean', 'ex std'])
+    df = pd.DataFrame(columns=['mf mean', 'mf std', 'ap full mean',
+                               'ap full std', 'ex full mean', 'ex full std',
+                               'ap mean', 'ap std', 'ex mean', 'ex std'])
     
     for i in tqdm(range(1, args.n+1)):
         N = args.base**i
         n_sample = 3 * args.base**(args.n-i)
 
         dt_mf = []
+        dt_ap_full = []
+        dt_ex_full = []
         dt_ap = []
-        dt_ex = []
         for k in range(n_sample):
             parameters = draw_samples(args, N)
 
             t1 = perf_counter()
             _ = q_modflow(*parameters[:3])
             t2 = perf_counter()
-            _ = q_approx_full(*parameters, args.aq_para)
+            _ = q_approx_full(*parameters[1:], args.aq_para)
             t3 = perf_counter()
-            _ = q_exact_full(*parameters, args.aq_para)
+            _ = q_exact_full(*parameters[1:], args.aq_para)
             t4 = perf_counter()
+            _ = q_approx(*parameters, args.aq_para)
+            t5 = perf_counter()
 
             dt_mf.append((t2 - t1) / N)
-            dt_ap.append((t3 - t2) / N)
-            dt_ex.append((t4 - t3) / N)
+            dt_ap_full.append((t3 - t2) / N)
+            dt_ex_full.append((t4 - t3) / N)
+            dt_ap.append((t5 - t4) / N)
 
         df.loc[i, 'mf mean'] = np.mean(dt_mf)
         df.loc[i, 'mf std'] = np.std(dt_mf)
+        df.loc[i, 'ap full mean'] = np.mean(dt_ap_full)
+        df.loc[i, 'ap full std'] = np.std(dt_ap_full)
+        df.loc[i, 'ex full mean'] = np.mean(dt_ex_full)
+        df.loc[i, 'ex full std'] = np.std(dt_ex_full)
         df.loc[i, 'ap mean'] = np.mean(dt_ap)
         df.loc[i, 'ap std'] = np.std(dt_ap)
-        df.loc[i, 'ex mean'] = np.mean(dt_ex)
-        df.loc[i, 'ex std'] = np.std(dt_ex)
+        df.loc[i, 'ex mean'] = np.nan
+        df.loc[i, 'ex std'] = np.nan
+
+    if args.n_BVP > 0:
+        for i in tqdm(range(1, args.n_BVP+1)):
+            N = args.base**i
+            n_sample = 3 * args.base**(args.n_BVP-i)
+
+            dt_ex = []
+            for k in tqdm(range(n_sample)):
+                parameters = draw_samples(args, N)
+
+                t1 = perf_counter()
+                _ = q_exact(*parameters, args.aq_para)
+                t2 = perf_counter()
+
+                dt_ex.append((t2 - t1) / N)
+
+            df.loc[i, 'ex mean'] = np.mean(dt_ex)
+            df.loc[i, 'ex std'] = np.std(dt_ex)
 
     df.to_csv(args.path / 'time.csv', sep=',', index=True, header=True)
     print(f'Data stored in {args.path / 'time.csv'}')
@@ -127,6 +151,7 @@ def main():
                         help='Minimal value of the vGM shape parameter')
     parser.add_argument('--base', type=int, default=3)
     parser.add_argument('--n', type=int, default=8)
+    parser.add_argument('--n_BVP', type=int, default=0)
     parser.add_argument('--output', type=str, default=None,
                         help='Path to directory')
     parser.add_argument('--clean', default=False, const=True, nargs='?',
