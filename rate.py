@@ -198,7 +198,7 @@ def q0_approx_full_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
     a_sh = C_SH_1 + C_SH_2 * xi
     q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
 
-    q0 = min(aq_cond, q0_sh)
+    q0 = np.min([aq_cond, q0_sh], axis=0)
 
     return q0
 
