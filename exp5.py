@@ -29,25 +29,7 @@ from rate import q_approx
 from rate import q_exact_full
 from rate import q_approx_full
 from rate import q_modflow
-from utils import timer
 import rose
-
-q_exact = np.vectorize(timer(q_exact))
-q_approx = np.vectorize(timer(q_approx))
-q_exact_full = np.vectorize(timer(q_exact_full))
-q_approx_full = np.vectorize(timer(q_approx_full))
-q_modflow = np.vectorize(timer(q_modflow))
-
-####################
-# Constants        #
-####################
-
-MIN_LOG_cl_cond = -8
-MAX_LOG_cl_cond = -6
-MIN_cl_th = 0
-MAX_cl_th = 3
-MIN_stage = 0
-MAX_stage = 5
 
 ####################
 # Functions        #
@@ -80,16 +62,18 @@ def run(args):
 
     # draw parameters
     aq_cond, aq_scale, aq_shape = draw_samples(args)
-    cl_cond = 10**np.random.uniform(low=MIN_LOG_cl_cond, high=MAX_LOG_cl_cond,
+    cl_cond = 10**np.random.uniform(low=args.MIN_LOG_cl_cond,
+                                    high=args.MAX_LOG_cl_cond,
                                     size=args.n_sample)
-    cl_th = np.random.uniform(low=MIN_cl_th, high=MAX_cl_th, size=args.n_sample)
-    stage = np.random.uniform(low=MIN_stage, high=MAX_stage, size=args.n_sample)
+    cl_th = np.random.uniform(low=args.MIN_cl_th, high=args.MAX_cl_th,
+                              size=args.n_sample)
+    stage = np.random.uniform(low=args.MIN_stage, high=args.MAX_stage,
+                              size=args.n_sample)
 
     # setup dataframe
     df = pd.DataFrame(columns=['stage', 'cl_cond', 'cl_th', 'aq_cond',
                                'aq_scale', 'aq_shape', 'aq_para',
                                'unsaturated', 'clogged', 'van_cap_zone',
-                               'dt_ap_dis', 'dt_ex_dis', 'dt_mf', 'dt_ex_mean',
                                'dt_ap_mean', 'rel_err_mf', 'rel_err_dis',
                                'rel_err_max'])
     df['stage'] = stage
@@ -100,11 +84,6 @@ def run(args):
     df['aq_shape'] = aq_shape
     df['aq_para'] = args.aq_para
     df['van_cap_zone'] = False
-    df['dt_ap_dis'] = np.nan
-    df['dt_ex_dis'] = np.nan
-    df['dt_mf'] = np.nan
-    df['dt_ex_mean'] = np.nan
-    df['dt_ap_mean'] = np.nan
     df['rel_err_mf'] = np.nan
     df['rel_err_dis'] = np.nan
     df['rel_err_max'] = np.nan
@@ -121,19 +100,13 @@ def run(args):
     idx = np.logical_and(df['unsaturated'], df['clogged'])
     print(f'{idx.sum()} valid configurations')
 
-    q_mf, dt_mf = q_modflow(stage[idx], cl_cond[idx], cl_th[idx])
-    q_ap_d, dt_ap_d = q_approx_full(stage[idx], cl_cond[idx], cl_th[idx],
-                                   aq_cond[idx], aq_scale[idx], aq_shape[idx],
-                                   args.aq_para)
-    q_ex_d, dt_ex_d = q_exact_full(stage[idx], cl_cond[idx], cl_th[idx],
-                                  aq_cond[idx], aq_scale[idx], aq_shape[idx],
-                                  args.aq_para)
-
+    q_mf = q_modflow(stage[idx], cl_cond[idx], cl_th[idx])
+    q_ap_d = q_approx_full(stage[idx], cl_cond[idx], cl_th[idx], aq_cond[idx],
+                           aq_scale[idx], aq_shape[idx], args.aq_para)
+    q_ex_d = q_exact_full(stage[idx], cl_cond[idx], cl_th[idx], aq_cond[idx],
+                          aq_scale[idx], aq_shape[idx], args.aq_para)
     df.loc[idx, 'rel_err_mf'] = (q_mf - q_ex_d) / q_ex_d
     df.loc[idx, 'rel_err_dis'] = (q_ap_d - q_ex_d) / q_ex_d
-    df.loc[idx, 'dt_mf'] = dt_mf
-    df.loc[idx, 'dt_ap_dis'] = dt_ap_d
-    df.loc[idx, 'dt_ex_dis'] = dt_ex_d
         
     # compute transionaly diconnected seepage
     depth_dis = (cl_th[idx] * (q_ex_d / cl_cond[idx] - 1) - stage[idx]) \
@@ -158,22 +131,14 @@ def run(args):
         n_dense = 10 * n_sparse
         w_dense = np.linspace(0, 2 * depth_dis[i], n_dense)
 
-        q_ex, dt_ex = q_exact(w_sparse, stage[i], cl_cond[i], cl_th[i], 
-                              aq_cond[i], aq_scale[i], aq_shape[i],
-                              args.aq_para, max_nodes=100)
+        q_ex = q_exact(w_sparse, np.ones_like(w_sparse) * stage[i], cl_cond[i],
+                       cl_th[i], aq_cond[i], aq_scale[i], aq_shape[i],
+                       args.aq_para, max_nodes=100)
         q_ex = np.interp(w_dense, w_sparse, q_ex)
-
-        q_ap, dt_ap = q_approx(w_dense, stage[i], cl_cond[i], cl_th[i],
-                               aq_cond[i], aq_scale[i], aq_shape[i],
-                               args.aq_para)
-        
+        q_ap = q_approx(w_dense, np.ones_like(w_dense) * stage[i], cl_cond[i],
+                        cl_th[i], aq_cond[i], aq_scale[i], aq_shape[i],
+                        args.aq_para)
         df.loc[i, 'rel_err_max'] = max((q_ap - q_ex) / q_ex)
-        df.loc[i, 'dt_ap_mean'] = dt_ap.mean()
-        df.loc[i, 'dt_ex_mean'] = dt_ex.mean()
-
-        # print('Variability of trans. disc. comp. time:')
-        # print(dt_ap.std() / dt_ap.mean())
-        # print(dt_ex.std() / dt_ex.mean())
 
     df.to_csv(args.path / 'rel_error.csv', sep=',', index=True, header=True)
     print(f'Data stored in {args.path / 'rel_error.csv'}')
@@ -189,6 +154,12 @@ def main():
                         help='number of samples')
     parser.add_argument('--nmin', type=float, default=1.1,
                         help='Minimal value of the vGM shape parameter')
+    parser.add_argument('--MIN_cl_th', type=float, default=0)
+    parser.add_argument('--MAX_cl_th', type=float, default=2)
+    parser.add_argument('--MIN_stage', type=float, default=0)
+    parser.add_argument('--MAX_stage', type=float, default=6)
+    parser.add_argument('--MIN_LOG_cl_cond', type=float, default=-8)
+    parser.add_argument('--MAX_LOG_cl_cond', type=float, default=-6)
     parser.add_argument('--output', type=str, default=None,
                         help='Path to directory')
     parser.add_argument('--clean', default=False, const=True, nargs='?',
@@ -217,7 +188,6 @@ def main():
 
     # run experiment
     run(args)
-
     
 if __name__ == '__main__':
     main()
