@@ -74,8 +74,7 @@ def run(args):
     df = pd.DataFrame(columns=['stage', 'cl_cond', 'cl_th', 'aq_cond',
                                'aq_scale', 'aq_shape', 'aq_para',
                                'unsaturated', 'clogged', 'van_cap_zone',
-                               'dt_ap_mean', 'rel_err_mf', 'rel_err_dis',
-                               'rel_err_max'])
+                               'rel_err_mf', 'rel_err_dis', 'rel_err_max'])
     df['stage'] = stage
     df['cl_cond'] = cl_cond
     df['cl_th'] = cl_th
@@ -134,11 +133,13 @@ def run(args):
         q_ex = q_exact(w_sparse, np.ones_like(w_sparse) * stage[i], cl_cond[i],
                        cl_th[i], aq_cond[i], aq_scale[i], aq_shape[i],
                        args.aq_para, max_nodes=100)
+        if sorted(q_ex) != list(q_ex): continue
         q_ex = np.interp(w_dense, w_sparse, q_ex)
         q_ap = q_approx(w_dense, np.ones_like(w_dense) * stage[i], cl_cond[i],
                         cl_th[i], aq_cond[i], aq_scale[i], aq_shape[i],
                         args.aq_para)
         df.loc[i, 'rel_err_max'] = max((q_ap - q_ex) / q_ex)
+
 
     df.to_csv(args.path / 'rel_error.csv', sep=',', index=True, header=True)
     print(f'Data stored in {args.path / 'rel_error.csv'}')
