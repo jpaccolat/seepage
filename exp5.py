@@ -73,8 +73,9 @@ def run(args):
     # setup dataframe
     df = pd.DataFrame(columns=['stage', 'cl_cond', 'cl_th', 'aq_cond',
                                'aq_scale', 'aq_shape', 'aq_para',
+                               'rel_err_mf', 'rel_err_dis', 'rel_err_max'
                                'unsaturated', 'clogged', 'van_cap_zone',
-                               'rel_err_mf', 'rel_err_dis', 'rel_err_max'])
+                               'increasing'])
     df['stage'] = stage
     df['cl_cond'] = cl_cond
     df['cl_th'] = cl_th
@@ -82,10 +83,11 @@ def run(args):
     df['aq_scale'] = aq_scale
     df['aq_shape'] = aq_shape
     df['aq_para'] = args.aq_para
-    df['van_cap_zone'] = False
     df['rel_err_mf'] = np.nan
     df['rel_err_dis'] = np.nan
     df['rel_err_max'] = np.nan
+    df['van_cap_zone'] = False
+    df['increasing'] = True
 
     # check unsaturated condition
     hc = cl_th * (aq_cond / cl_cond - 1)
@@ -133,7 +135,9 @@ def run(args):
         q_ex = q_exact(w_sparse, np.ones_like(w_sparse) * stage[i], cl_cond[i],
                        cl_th[i], aq_cond[i], aq_scale[i], aq_shape[i],
                        args.aq_para, max_nodes=100)
-        if sorted(q_ex) != list(q_ex): continue
+        if sorted(q_ex) != list(q_ex):
+            df.loc[i, 'increasing'] = False
+            continue
         q_ex = np.interp(w_dense, w_sparse, q_ex)
         q_ap = q_approx(w_dense, np.ones_like(w_dense) * stage[i], cl_cond[i],
                         cl_th[i], aq_cond[i], aq_scale[i], aq_shape[i],
