@@ -29,9 +29,6 @@ from rate import q_approx_full
 from rate import q_modflow
 import rose
 
-q_exact = np.vectorize(q_exact)
-q_exact_full = np.vectorize(q_exact_full)
-
 ####################
 # Constants        #
 ####################

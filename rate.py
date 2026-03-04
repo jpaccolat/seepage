@@ -74,6 +74,7 @@ def q_exact(depth: float, stage: float, cl_cond: float, cl_th: float,
     sol = solve_bvp(fun, bc, z, y, p=[guess], max_nodes=max_nodes, tol=tol)
 
     return sol.p[0]
+q_exact = np.vectorize(q_exact)
 
 def q_exact_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
@@ -112,6 +113,7 @@ def q_exact_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
     q = cl_cond * (1 + (stage + psi_interface) / cl_th)
 
     return q
+q_exact_full = np.vectorize(q_exact_full)
 
 def q_approx(depth: float, stage: float, cl_cond: float, cl_th: float,
              aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str):
