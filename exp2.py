@@ -189,65 +189,6 @@ def fit_a_sh(args):
     df_sh.to_csv(args.path / 'a_sh.csv', sep=',', index=True, header=True)
     print(f'a_sh values stored in {args.path / 'a_sh.csv'}')
 
-def fit_a_nsh(args):
-    """To be done"""
-
-    if args.aq_para != 'vGM':
-        print(f'a_nsh is not defined for {args.aq_para}. Skip computation.')
-        return 0
-    
-    # interval to scan
-    b = np.linspace(MIN_b, MAX_b, NUM_b)
-    aq_shape = (2 * b + 1) / 5
-    B = (1 - 1 / aq_shape)**2
-    
-    # set inputs
-    aq_cond = 1.
-    aq_scale = 1.
-    cl_cond = aq_cond / FIX_cond_ratio
-
-    df = pd.DataFrame(index=range(NUM_b))
-    df['aq_shape'] = aq_shape
-    df['b'] = b
-    df['cond_ratio'] = FIX_cond_ratio
-
-    # fit parameters
-    for i in tqdm(range(NUM_b)):
-        # define x-range of the fit
-        x_sh = FIX_cond_ratio**(1+1/b[i])
-        N = int((1+1/b[i]) * np.log10(FIX_cond_ratio) / DEL_LOG_x)
-        x = np.geomspace(1, x_sh, N)
-        cl_th = B[i]**(1/b[i]) * aq_scale / FIX_cond_ratio * x
-
-        # fit a_nsh
-        def fun_to_minimize(a_nsh):
-            y_ex = q_exact_full(0., cl_cond, cl_th, aq_cond, aq_scale,
-                               aq_shape[i], 'vGM')
-            y_ap = q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale,
-                                      aq_shape[i], a_nsh)
-            return np.log10(y_ap / aq_cond) - np.log10(y_ex / aq_cond)
-        res = least_squares(fun_to_minimize, x0=[2], method='lm')
-
-        print(b[i])
-        print(res.message)
-
-        # best parameter
-        df.loc[i, 'a_nsh'] = res.x[0]
-        df.loc[i, 'cost'] = res.cost
-
-        # residual metrics
-        df.loc[i, 'res. min'] = 10**np.min(res.fun)
-        df.loc[i, 'res. max'] = 10**np.max(res.fun)
-
-        # relative position of the min and max errors (0=x_sh^.5, 1=x_sh^1.5)
-        imin = np.argmin(res.fun)
-        df.loc[i, 'pos. min'] = np.log10(x[imin]) / np.log10(x_sh)
-        imax = np.argmax(res.fun)
-        df.loc[i, 'pos. max'] = np.log10(x[imax]) / np.log10(x_sh)
-
-    df.to_csv(args.path / 'a_nsh.csv', sep=',', index=True, header=True)
-    print(f'a_nsh values stored in {args.path / 'a_nsh.csv'}')
-
 def run(args):
     """Run experiment 2."""
 
@@ -256,9 +197,6 @@ def run(args):
 
     if 'sh' in args.fit:
         fit_a_sh(args)
-
-    if 'nsh' in args.fit:
-        fit_a_nsh(args)
 
 def dump_constants(args):
     """Save module constants."""

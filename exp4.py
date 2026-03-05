@@ -1,8 +1,20 @@
 #!/usr/bin/env python
 
-"""Third experiment.
+"""Fourth experiment.
 
-Compute exact and approximate infiltrabilities.
+Compute seepage relative errors for 
+- the MODFLOW formula,
+- the novel approximate expression at full disconnection (q_approx_full), and
+- the novel approximate expression for finite water table depth (q_approx); only
+the maximal relative error is retained.
+
+The user defines the unsaturated parametrization: vGM or BCB.
+
+The user defines the aquifer texture: SAND or SAND_LOAM.
+
+The user defines the upper and lower bounds of the other parameters. Stage and
+clogging thickness are drawn from a uniform distribution, while clogging
+conductivity is drawn from a log-uniform distribution.
 """
 
 ####################
@@ -12,8 +24,6 @@ Compute exact and approximate infiltrabilities.
 # Standard imports
 import pathlib
 import argparse
-import json
-from itertools import product
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -32,26 +42,31 @@ from rate import q_modflow
 import rose
 
 ####################
-# Constants        #
-####################
-
-LIST_stage = [0., 0.2, 1.0, 2.0]
-LIST_cl_cond = [1e-8]
-LIST_cl_th = [0.1, 1.]
-
-####################
 # Functions        #
 ###################
 
 def draw_samples(args):
+    """
+    Generate random arrays of stage, cl_cond, cl_th, aq_cond, aq_scale and
+    aq_shape.
+    """
 
-    if args.texture == 'SAND':
-        aq = rose.get_sand(args.n_sample)
-    elif args.texture == 'SILT':
-        aq = rose.get_silt(args.n_sample)
-    else:
-        print('Texture must be SAND or SILT.')
+    stage = np.random.uniform(low=args.MIN_stage, high=args.MAX_stage,
+                              size=args.n_sample)
+    cl_cond = 10**np.random.uniform(low=args.MIN_LOG_cl_cond,
+                                    high=args.MAX_LOG_cl_cond,
+                                    size=args.n_sample)
+    cl_th = np.random.uniform(low=args.MIN_cl_th, high=args.MAX_cl_th,
+                              size=args.n_sample)
 
+    # aquifer properties
+    bounds = {
+        'K': [0, np.inf],
+        'hg': [0, np.inf],
+        'n': [args.nmin, np.inf]
+    }
+
+    aq = rose.sample_soils(args.texture, args.n_sample, bounds=bounds)
     aq_cond = aq['K']
     aq_scale = aq['hg']
     aq_shape = aq['n']
@@ -63,116 +78,125 @@ def draw_samples(args):
         aq_shape = (b - 2) / 3
     else: assert args.aq_para == 'vGM', 'Bad parametrization. Use vGM or BCB.'
 
-    return aq_cond, aq_scale, aq_shape
+    return stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape
 
 def run(args):
-    """Run experiment 4."""
+    """Compute seepage relative errors and save them in a csv file."""
 
-    aq_cond, aq_scale, aq_shape = draw_samples(args)
+    # draw parameters
+    stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape = draw_samples(args)
 
+    # setup dataframe
     df = pd.DataFrame(columns=['stage', 'cl_cond', 'cl_th', 'aq_cond',
-                               'aq_scale', 'aq_shape', 'aq_para', 'unsaturated',
-                               'clogged', 'rel_err_dis', 'rel_err_mf',
-                               'rel_err_max', 'vvz'])
+                               'aq_scale', 'aq_shape', 'aq_para',
+                               'rel_err_mf', 'rel_err_dis', 'rel_err_max'
+                               'unsaturated', 'clogged', 'van_cap_zone',
+                               'increasing'])
+    df['stage'] = stage
+    df['cl_cond'] = cl_cond
+    df['cl_th'] = cl_th
+    df['aq_cond'] = aq_cond
+    df['aq_scale'] = aq_scale
+    df['aq_shape'] = aq_shape
+    df['aq_para'] = args.aq_para
+    df['rel_err_mf'] = np.nan
+    df['rel_err_dis'] = np.nan
+    df['rel_err_max'] = np.nan
+    df['van_cap_zone'] = False
+    df['increasing'] = True
+
+    # check unsaturated condition
+    hc = cl_th * (aq_cond / cl_cond - 1)
+    if args.aq_para == 'BCB': hc -= aq_scale
+    df['unsaturated'] = stage < hc
+
+    # check clogging condition
+    df['clogged'] = cl_cond < aq_cond
     
-    for v1, v2, v3 in tqdm(product(LIST_stage, LIST_cl_cond, LIST_cl_th)):
-        
-        df_ = pd.DataFrame(index=range(args.n_sample))
-        df_['aq_cond'] = aq_cond
-        df_['aq_scale'] = aq_scale
-        df_['aq_shape'] = aq_shape
-        df_['aq_para'] = args.aq_para
-        df_['stage'] = v1
-        df_['cl_cond'] = v2
-        df_['cl_th'] = v3
-        df_['vvz'] = False
+    # compute fully disconnected seepage
+    idx = np.logical_and(df['unsaturated'], df['clogged'])
+    print(f'{idx.sum()} valid configurations')
 
-        # check unsaturated condition
-        hc = v3 * (aq_cond / v2 - 1)
-        if args.aq_para == 'BCB': hc -= aq_scale
-        df_['unsaturated'] = v1 < hc
-
-        # check clogging condition
-        df_['clogged'] = v2 < aq_cond
+    q_mf = q_modflow(stage[idx], cl_cond[idx], cl_th[idx])
+    q_ap_d = q_approx_full(stage[idx], cl_cond[idx], cl_th[idx], aq_cond[idx],
+                           aq_scale[idx], aq_shape[idx], args.aq_para)
+    q_ex_d = q_exact_full(stage[idx], cl_cond[idx], cl_th[idx], aq_cond[idx],
+                          aq_scale[idx], aq_shape[idx], args.aq_para)
+    df.loc[idx, 'rel_err_mf'] = (q_mf - q_ex_d) / q_ex_d
+    df.loc[idx, 'rel_err_dis'] = (q_ap_d - q_ex_d) / q_ex_d
         
-        idx = np.logical_and(df_['unsaturated'], df_['clogged'])
-        if idx.sum() == 0:
-            df_['rel_err_dis'] = np.nan
-            df_['rel_err_max'] = np.nan
-            df_['rel_err_mf'] = np.nan
+    # compute transionaly diconnected seepage
+    depth_dis = (cl_th[idx] * (q_ex_d / cl_cond[idx] - 1) - stage[idx]) \
+                / (1 - q_ex_d / aq_cond[idx])
+
+    print('Start searching max errors')
+    for i in tqdm(df.loc[idx].index):
+
+        # assert depth to disconnection is well defined
+        if np.isnan(depth_dis[i]):
+            print('Unresolved disconnected depth')
+            print(stage[i], cl_cond[i], cl_th[i], aq_cond[i], aq_scale[i],
+                  aq_shape[i])
             continue
     
-        # compute rel. error when fully disconnected
-        q_ex_d = np.full(args.n_sample, np.nan, dtype=float)
-        q_ex_d[idx] = q_exact_full(v1, v2, v3, aq_cond[idx], aq_scale[idx],
-                                  aq_shape[idx], args.aq_para)
-        q_ap_d = np.full(args.n_sample, np.nan, dtype=float)
-        q_ap_d[idx] = q_approx_full(v1, v2, v3, aq_cond[idx], aq_scale[idx],
-                                   aq_shape[idx], args.aq_para)
-        q_mf = q_modflow(v1, v2, v3)
+        # assert depth to disconnection is not vanishing (or negative)
+        if depth_dis[i] < 5e-2:
+            df.loc[i, 'van_cap_zone'] = True
+            df.loc[i, 'rel_err_max'] = df.loc[i, 'rel_err_dis']
+            continue
 
-        df_['rel_err_dis'] = (q_ap_d - q_ex_d) / q_ex_d
-        df_['rel_err_mf'] = (q_mf - q_ex_d) / q_ex_d
+        # scan exact solution over a sparse interval (slow to compute)
+        n_sparse = min(10, int(depth_dis[i] / 2e-2) + 1)
+        w_sparse = np.linspace(0, 2 * depth_dis[i], n_sparse)
+        q_ex = q_exact(w_sparse, np.ones_like(w_sparse) * stage[i], cl_cond[i],
+                       cl_th[i], aq_cond[i], aq_scale[i], aq_shape[i],
+                       args.aq_para, max_nodes=100)
+        # assert solution is correct
+        if sorted(q_ex) != list(q_ex): 
+            df.loc[i, 'increasing'] = False
+            continue
 
-        # compute maximal rel. error (for a finite WT depth)
-        depth_dis = (v3 * (q_ex_d / v2 - 1) - v1) / (1 - q_ex_d / aq_cond)
-        for i in range(args.n_sample):
+        # scan approximate solution over a dense interval
+        n_dense = 10 * n_sparse
+        w_dense = np.linspace(0, 2 * depth_dis[i], n_dense)
+        q_ap = q_approx(w_dense, np.ones_like(w_dense) * stage[i], cl_cond[i],
+                        cl_th[i], aq_cond[i], aq_scale[i], aq_shape[i],
+                        args.aq_para)
+        
+        # compute relative error
+        q_ex = np.interp(w_dense, w_sparse, q_ex)
+        df.loc[i, 'rel_err_max'] = max((q_ap - q_ex) / q_ex)
 
-            if np.isnan(depth_dis[i]):
-                df_.loc[i, 'rel_err_max'] = np.nan
-                continue
-
-            if depth_dis[i] < 5e-2:
-                df_.loc[i, 'rel_err_max'] = np.nan
-                df_.loc[i, 'vvz'] = True 
-                continue
-
-            n_sparse = min(10, int(depth_dis[i] / 2e-2) + 1)
-            w_sparse = np.linspace(0, 2 * depth_dis[i], n_sparse)
-            n_dense = 10 * n_sparse
-            w_dense = np.linspace(0, 2 * depth_dis[i], n_dense)
-
-            q_ex = q_exact(w_sparse, v1, v2, v3, aq_cond[i], aq_scale[i],
-                           aq_shape[i], args.aq_para, max_nodes=100)
-            q_ex = np.interp(w_dense, w_sparse, q_ex)
-
-            q_ap = q_approx(w_dense, v1, v2, v3, aq_cond[i], aq_scale[i],
-                            aq_shape[i], args.aq_para)
-            df_.loc[i, 'rel_err_max'] = max((q_ap - q_ex) / q_ex)
-
-        df = pd.concat([df, df_], ignore_index=True)
-
+    # save data
     df.to_csv(args.path / 'rel_error.csv', sep=',', index=True, header=True)
-    print(f'Seepage rates stored in {args.path / 'rel_error.csv'}')
-
-def dump_constants(args):
-    """Save module constants which define the regular grid."""
-
-    d = {         
-        'stage': LIST_stage,   
-        'cl_th': LIST_cl_th,
-        'cl_cond': LIST_cl_cond
-    }   
-    json.dump(d, open(args.path / 'constants.txt', 'w'))
+    print(f'Data stored in {args.path / 'rel_error.csv'}')
 
 def main():
 
-    parser = argparse.ArgumentParser(
-                        prog='exp4',
-                        description='')
-    parser.add_argument('--aq_para', type=str, required=True, help='vGM or BCB')
+    parser = argparse.ArgumentParser(prog='exp5', description='')
+    parser.add_argument('--aq_para', type=str, required=True,
+                        help='vGM or BCB')
     parser.add_argument('--texture', type=str, required=True,
-                        help='SAND or SILT')
+                        help='SAND or SAND_LOAM')
     parser.add_argument('--n_sample', type=int, required=True,
                         help='number of samples')
-    parser.add_argument('--output', type=str, help='Path to directory')
+    parser.add_argument('--nmin', type=float, default=1.1,
+                        help='Minimal value of the vGM shape parameter')
+    parser.add_argument('--MIN_cl_th', type=float, default=0)
+    parser.add_argument('--MAX_cl_th', type=float, default=2)
+    parser.add_argument('--MIN_stage', type=float, default=0)
+    parser.add_argument('--MAX_stage', type=float, default=6)
+    parser.add_argument('--MIN_LOG_cl_cond', type=float, default=-8)
+    parser.add_argument('--MAX_LOG_cl_cond', type=float, default=-6)
+    parser.add_argument('--output', type=str, default=None,
+                        help='Path to directory')
     parser.add_argument('--clean', default=False, const=True, nargs='?',
                         help='Empty output folder')
     args = parser.parse_args()
 
     # set default output directory name
     if args.output is None:
-        args.output = f'exp4_{args.aq_para}_{args.texture}'
+        args.output = f'exp5_{args.aq_para}_{args.texture}'
 
     # handle output directory
     args.path = pathlib.Path(args.output)
@@ -190,12 +214,8 @@ def main():
             else:
                 return 0
 
-    # save constants
-    dump_constants(args)
-
     # run experiment
     run(args)
-
     
 if __name__ == '__main__':
     main()

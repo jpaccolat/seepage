@@ -2,7 +2,10 @@
 
 """Third experiment.
 
-Compute exact and approximate infiltrabilities.
+Compute exact and approximate seepage over the infiltrability plane. The goal
+is to plot the relative error on the plane for different shape parameters and
+values of a_nsh -- the merging exponent -- to motivate and expression for 
+a_nsh(b). The latter is discussed in the companion notebook.
 """
 
 ####################
@@ -106,8 +109,7 @@ def q0_approximate(cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para,
     return q0
 
 def run(args):
-    """
-    """
+    """Run experiment 3."""
 
     # intervals to scan
     b = np.linspace(MIN_b, MAX_b, NUM_b)
@@ -134,6 +136,7 @@ def run(args):
     cl_cond = aq_cond / cond_ratio
     cl_th = B**(1/b) * aq_scale / cond_ratio * x
 
+    # init dataframe
     df = pd.DataFrame(index=range(NUM_b * NUM_x * NUM_cond_ratio),
                       columns=['stage', 'cl_cond', 'cl_th', 'aq_cond',
                                'aq_scale', 'aq_shape', 'aq_para'])
@@ -154,11 +157,12 @@ def run(args):
                                     )
 
     # compute rates
-    df['q0_ex'] = q_exact_full(0., cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
-                              args.aq_para)
+    df['q0_ex'] = q_exact_full(0., cl_cond, cl_th, aq_cond, aq_scale, aq_shape, 
+                               args.aq_para)
     df['q0_ap'] = q0_approximate(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
                                  args.aq_para, C_NSH=args.C_NSH)
     
+    # save data
     if args.C_NSH is not None:
         name = f'rates_{args.C_NSH}.csv'
     else:
