@@ -1,8 +1,20 @@
 #!/usr/bin/env python
 
-"""Third experiment.
+"""Fourth experiment.
 
-Compute exact and approximate infiltrabilities.
+Compute seepage relative errors for 
+- the MODFLOW formula,
+- the novel approximate expression at full disconnection (q_approx_full), and
+- the novel approximate expression for finite water table depth (q_approx); only
+the maximal relative error is retained.
+
+The user defines the unsaturated parametrization: vGM or BCB.
+
+The user defines the aquifer texture: SAND or SAND_LOAM.
+
+The user defines the upper and lower bounds of the other parameters. Stage and
+clogging thickness are drawn from a uniform distribution, while clogging
+conductivity is drawn from a log-uniform distribution.
 """
 
 ####################
@@ -12,8 +24,6 @@ Compute exact and approximate infiltrabilities.
 # Standard imports
 import pathlib
 import argparse
-import json
-from itertools import product
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -36,7 +46,20 @@ import rose
 ###################
 
 def draw_samples(args):
+    """
+    Generate random arrays of stage, cl_cond, cl_th, aq_cond, aq_scale and
+    aq_shape.
+    """
 
+    stage = np.random.uniform(low=args.MIN_stage, high=args.MAX_stage,
+                              size=args.n_sample)
+    cl_cond = 10**np.random.uniform(low=args.MIN_LOG_cl_cond,
+                                    high=args.MAX_LOG_cl_cond,
+                                    size=args.n_sample)
+    cl_th = np.random.uniform(low=args.MIN_cl_th, high=args.MAX_cl_th,
+                              size=args.n_sample)
+
+    # aquifer properties
     bounds = {
         'K': [0, np.inf],
         'hg': [0, np.inf],
@@ -55,20 +78,13 @@ def draw_samples(args):
         aq_shape = (b - 2) / 3
     else: assert args.aq_para == 'vGM', 'Bad parametrization. Use vGM or BCB.'
 
-    return aq_cond, aq_scale, aq_shape
+    return stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape
 
 def run(args):
-    """Run experiment 4."""
+    """Compute seepage relative errors and save them in a csv file."""
 
     # draw parameters
-    aq_cond, aq_scale, aq_shape = draw_samples(args)
-    cl_cond = 10**np.random.uniform(low=args.MIN_LOG_cl_cond,
-                                    high=args.MAX_LOG_cl_cond,
-                                    size=args.n_sample)
-    cl_th = np.random.uniform(low=args.MIN_cl_th, high=args.MAX_cl_th,
-                              size=args.n_sample)
-    stage = np.random.uniform(low=args.MIN_stage, high=args.MAX_stage,
-                              size=args.n_sample)
+    stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape = draw_samples(args)
 
     # setup dataframe
     df = pd.DataFrame(columns=['stage', 'cl_cond', 'cl_th', 'aq_cond',
@@ -116,35 +132,42 @@ def run(args):
     print('Start searching max errors')
     for i in tqdm(df.loc[idx].index):
 
+        # assert depth to disconnection is well defined
         if np.isnan(depth_dis[i]):
             print('Unresolved disconnected depth')
             print(stage[i], cl_cond[i], cl_th[i], aq_cond[i], aq_scale[i],
                   aq_shape[i])
             continue
     
+        # assert depth to disconnection is not vanishing (or negative)
         if depth_dis[i] < 5e-2:
             df.loc[i, 'van_cap_zone'] = True
             df.loc[i, 'rel_err_max'] = df.loc[i, 'rel_err_dis']
             continue
 
+        # scan exact solution over a sparse interval (slow to compute)
         n_sparse = min(10, int(depth_dis[i] / 2e-2) + 1)
         w_sparse = np.linspace(0, 2 * depth_dis[i], n_sparse)
-        n_dense = 10 * n_sparse
-        w_dense = np.linspace(0, 2 * depth_dis[i], n_dense)
-
         q_ex = q_exact(w_sparse, np.ones_like(w_sparse) * stage[i], cl_cond[i],
                        cl_th[i], aq_cond[i], aq_scale[i], aq_shape[i],
                        args.aq_para, max_nodes=100)
-        if sorted(q_ex) != list(q_ex):
+        # assert solution is correct
+        if sorted(q_ex) != list(q_ex): 
             df.loc[i, 'increasing'] = False
             continue
-        q_ex = np.interp(w_dense, w_sparse, q_ex)
+
+        # scan approximate solution over a dense interval
+        n_dense = 10 * n_sparse
+        w_dense = np.linspace(0, 2 * depth_dis[i], n_dense)
         q_ap = q_approx(w_dense, np.ones_like(w_dense) * stage[i], cl_cond[i],
                         cl_th[i], aq_cond[i], aq_scale[i], aq_shape[i],
                         args.aq_para)
+        
+        # compute relative error
+        q_ex = np.interp(w_dense, w_sparse, q_ex)
         df.loc[i, 'rel_err_max'] = max((q_ap - q_ex) / q_ex)
 
-
+    # save data
     df.to_csv(args.path / 'rel_error.csv', sep=',', index=True, header=True)
     print(f'Data stored in {args.path / 'rel_error.csv'}')
 
