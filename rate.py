@@ -1,17 +1,8 @@
 #!/usr/bin/env python
 
-"""Rate module.
+"""Seepage rate formulas.
 
-This module defines functions to compute the following seepage rates:
- - q0_exact
- - q0_approximate
- - q0_negligible
- - q0_soft
- - q0_hard
- - q_exact
- - q_linear (q0_exact + stage / resistance)
- - q_approximate (q0_approximate + stage / resistance)
- - q_modflow
+All exact and approximate formulas to compute seepage are listed here.
 """
 
 ####################
@@ -19,7 +10,6 @@ This module defines functions to compute the following seepage rates:
 ####################
 
 # Standard imports
-import time
 
 # Third party imports
 import numpy as np
@@ -36,15 +26,34 @@ from uhc import get_rhc
 def q_exact(depth: float, stage: float, cl_cond: float, cl_th: float,
             aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str,
             guess=0., max_nodes=1000, tol=1e-3):
-    
     """
+    Exact seepage through a clogging layer with a shallow water table.
+
     Solve the steady state Richard's equation for given boundary conditions.
-    The solution is stored as a class attribute.
 
     Parameters
     ----------
+    depth: float
+        Depth to the water table [m].
+    stage: float
+        Water depth in the stream [m].
+    cl_cond: float
+        Hydraulic conductivity of the clogging layer [m/s].
+    cl_th: float
+        Thickness of the clogging layer [m].
+    aq_cond: float
+        Hydraulic conductivity of the underlying aquifer [m/s].
+    aq_scale: float
+        Scale parameter of the unsaturated parametrization of the underlying
+        aquifer [m].
+    aq_shape: float
+        Shape parameter of the unsaturated parametrization of the underlying
+        aquifer [-].
+    aq_para: str
+        Name of the unsaturated parametrization of the underlying aquifer.
+        Either vGM (van Genuchten - Mualem) or BCB (Brooks - Corey - Burdine).
     guess: float, optional
-        Initial guess for the infiltration rate in [m/s]. Default is 0.
+        Initial guess of seepage rate. Default is 0.
     max_nodes: int, optional
         Maximal number of nodes. Default is 1000.
     tol: float, optional
@@ -54,13 +63,10 @@ def q_exact(depth: float, stage: float, cl_cond: float, cl_th: float,
     rhc = get_rhc(aq_para)
 
     def fun(x, y, p):
-
         psi = -y[0]
         cond = cl_cond * np.ones_like(psi)
-
         idx = x > cl_th
         cond[idx] = aq_cond * rhc(psi[idx], aq_scale, aq_shape)
-
         return np.vstack([1 - p[0] / cond])
 
     def bc(ya, yb, p):
@@ -79,24 +85,29 @@ q_exact = np.vectorize(q_exact)
 def q_exact_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
     """
-    Compute exact disconnected seepage rate by solving the unsaturated Darcy 
-    equation.
+    Exact seepage through a clogging layer at full disconnection.
 
-    Parameters:
-    stage (float)
-        water depth in the river [L].
-    cl_cond (float):
-        Hydraulic conductivity of the clogging layer [L/T].
-    cl_th (float):
-        Thickness of the clogging layer [L].
-    aq_cond (float)
-        Hydraulic conductivity of the aquifer [L/T].
-    aq_scale (float)
-        Scale parameter of the aquifer [L].
-    aq_shape (float)
-        Shape parameter of the aquifer [-].
-    aq_para (str)
-        Unsaturated hydraulic conductivity parametrization.
+    Solve the unsaturated Darcy equation.
+
+    Parameters
+    ----------
+    stage: float
+        Water depth in the stream [m].
+    cl_cond: float
+        Hydraulic conductivity of the clogging layer [m/s].
+    cl_th: float
+        Thickness of the clogging layer [m].
+    aq_cond: float
+        Hydraulic conductivity of the underlying aquifer [m/s].
+    aq_scale: float
+        Scale parameter of the unsaturated parametrization of the underlying
+        aquifer [m].
+    aq_shape: float
+        Shape parameter of the unsaturated parametrization of the underlying
+        aquifer [-].
+    aq_para: str
+        Name of the unsaturated parametrization of the underlying aquifer.
+        Either vGM (van Genuchten - Mualem) or BCB (Brooks - Corey - Burdine).
     """
     
     rhc = get_rhc(aq_para)
@@ -107,8 +118,7 @@ def q_exact_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
         return lhs - rhs
         
     psi_interface_init = aq_scale
-    x, _, ier, _ = fsolve(darcy, psi_interface_init, full_output=True)
-    #psi_interface = x[0] if ier == 1 else np.nan
+    x, _, _, _ = fsolve(darcy, psi_interface_init, full_output=True)
     psi_interface = x[0]
     q = cl_cond * (1 + (stage + psi_interface) / cl_th)
 
@@ -117,6 +127,31 @@ q_exact_full = np.vectorize(q_exact_full)
 
 def q_approx(depth: float, stage: float, cl_cond: float, cl_th: float,
              aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str):
+    """
+    Approximate seepage through a clogging layer with a shallow water table.
+
+    Parameters
+    ----------
+    depth: float
+        Depth to the water table [m].
+    stage: float
+        Water depth in the stream [m].
+    cl_cond: float
+        Hydraulic conductivity of the clogging layer [m/s].
+    cl_th: float
+        Thickness of the clogging layer [m].
+    aq_cond: float
+        Hydraulic conductivity of the underlying aquifer [m/s].
+    aq_scale: float
+        Scale parameter of the unsaturated parametrization of the underlying
+        aquifer [m].
+    aq_shape: float
+        Shape parameter of the unsaturated parametrization of the underlying
+        aquifer [-].
+    aq_para: str
+        Name of the unsaturated parametrization of the underlying aquifer.
+        Either vGM (van Genuchten - Mualem) or BCB (Brooks - Corey - Burdine).
+    """
     
     q1 = (stage + cl_th + depth) / (cl_th / cl_cond + depth / aq_cond)
     q2 = q_approx_full(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
@@ -127,6 +162,29 @@ def q_approx(depth: float, stage: float, cl_cond: float, cl_th: float,
 
 def q_approx_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
                   aq_scale: float, aq_shape: float, aq_para: str):
+    """
+    Approximate seepage through a clogging layer at full disconnection.
+
+    Parameters
+    ----------
+    stage: float
+        Water depth in the stream [m].
+    cl_cond: float
+        Hydraulic conductivity of the clogging layer [m/s].
+    cl_th: float
+        Thickness of the clogging layer [m].
+    aq_cond: float
+        Hydraulic conductivity of the underlying aquifer [m/s].
+    aq_scale: float
+        Scale parameter of the unsaturated parametrization of the underlying
+        aquifer [m].
+    aq_shape: float
+        Shape parameter of the unsaturated parametrization of the underlying
+        aquifer [-].
+    aq_para: str
+        Name of the unsaturated parametrization of the underlying aquifer.
+        Either vGM (van Genuchten - Mualem) or BCB (Brooks - Corey - Burdine).
+    """
     
     if aq_para == 'vGM':
         q = q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale,
@@ -138,6 +196,9 @@ def q_approx_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
     return q
 
 def q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
+    """
+    Approximate seepage at full disconnection for the vGM parametrization.
+    """
     
     q0 = q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
 
@@ -154,6 +215,10 @@ def q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
                        C_NS_1=-0.3850, C_NS_2=0.2056, C_NS_3=0.5818,
                        C_SH_1=0.4633, C_SH_2=0.5396, C_NSH_1=1.05, C_NSH_2=0.25,
                        C_NSH_3=6):
+    """
+    Approximate seepage at full disconnection and zero ponding for the vGM
+    parametrization.
+    """
 
     b = 0.5 * (5 * aq_shape - 1)
     B = (1 - 1 / aq_shape)**2
@@ -175,6 +240,9 @@ def q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
     return q0
 
 def q_approx_full_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
+    """
+    Approximate seepage at full disconnection for the BCB parametrization.
+    """
 
     q0 = q0_approx_full_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
 
@@ -189,6 +257,10 @@ def q_approx_full_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
 
 def q0_approx_full_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
                        C_SH_1=0.4633, C_SH_2=0.5396):
+    """
+    Approximate seepage at full disconnection and zero ponding for the BCB
+    parametrization.
+    """
 
     b = 2 + 3 * aq_shape
     B = 1
@@ -205,12 +277,27 @@ def q0_approx_full_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
     return q0
 
 def q0_negl_to_soft(aq_cond, x, xi, a_ns):
+    """Transition equation from negligible to soft"""
     return aq_cond * (1 + x**a_ns)**(-xi/a_ns)
 
 def q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh):
+    """Transition equation from soft to hard"""
     return cl_cond * (1 + (x_sh / x)**a_sh)**(xi / a_sh)
 
 def q_modflow(stage: float, cl_cond: float, cl_th: float):
+    """
+    Approximate seepage through a clogging layer at full disconnection according
+    to MODFLOW
+
+    Parameters
+    ----------
+    stage: float
+        Water depth in the stream [m].
+    cl_cond: float
+        Hydraulic conductivity of the clogging layer [m/s].
+    cl_th: float
+        Thickness of the clogging layer [m].
+    """
 
     q = cl_cond * (1 + stage / cl_th)
 
@@ -218,13 +305,14 @@ def q_modflow(stage: float, cl_cond: float, cl_th: float):
 
 def q0_asymptote_negl(cl_cond: float,  cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
-    
+    """Negligible asymptotic solution"""
     q0 = aq_cond
 
     return q0
 
 def q0_asymptote_soft(cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
+    """Soft asymptotic solution"""
     
     if aq_para == 'vGM':
         b = 0.5 * (5 * aq_shape - 1)
@@ -240,6 +328,7 @@ def q0_asymptote_soft(cl_cond: float, cl_th: float, aq_cond: float,
 
 def q0_asymptote_hard(cl_cond: float, cl_th: float, aq_cond: float,
              aq_scale: float, aq_shape: float, aq_para: str):
+    """Hard asymptotic solution"""
     
     q0 = cl_cond
     

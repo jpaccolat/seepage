@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""Utilities."""
+"""Some util functions."""
 
 ####################
 # Libraries        #
@@ -15,6 +15,10 @@ import time
 ####################
 
 def get_generalized_shape_parameters(aq_shape, aq_para):
+    """
+    Return the generalized shape parameters (b and B) associted to the shape
+    parameter of vGM or BCB.
+    """
 
     if aq_para == 'vGM':
         b = 0.5 * (5 * aq_shape - 1)
@@ -27,6 +31,10 @@ def get_generalized_shape_parameters(aq_shape, aq_para):
     return b, B
 
 def get_Dless_parameters(cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para):
+    """
+    Return all dimensionless parameters (b, B, xi, x and x_sh) associated to a
+    given streambed profile.
+    """
 
     b, B = get_generalized_shape_parameters(aq_shape, aq_para)
     xi = b / (1 + b)
@@ -34,14 +42,3 @@ def get_Dless_parameters(cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para):
     x_sh = (aq_cond / cl_cond)**(1/xi)
 
     return b, B, xi, x, x_sh
-
-def timer(func):
-    @functools.wraps(func)
-    def wrapper_timer(*args, **kwargs):
-        tic = time.perf_counter()
-        value = func(*args, **kwargs)
-        toc = time.perf_counter()
-        elapsed_time = toc - tic
-        #print(f"Elapsed time: {elapsed_time:0.4f} seconds")
-        return value, elapsed_time
-    return wrapper_timer

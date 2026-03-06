@@ -28,6 +28,11 @@ import pandas as pd
 ####################
 
 def get_gaussian_parameters(name):
+    """
+    Return mean and standard deviation of the Gaussian distriutions of hydraulic
+    conductivity, scale (alpha) and shape parameter of the vGM parametrization 
+    associated to a textural class according to Rosetta3.
+    """
 
     if name == 'SAND':
         p = {
@@ -78,6 +83,10 @@ def get_gaussian_parameters(name):
     return p
 
 def get_hydraulic_conductivity(N, mean, std, bounds=[0, np.inf]):
+    """
+    Return a list of normaly distributed hydraulic conductivities in m/s. Bounds
+    on the distribution can be imposed.
+    """
 
     larger_N = 2 * N
     while True:
@@ -94,6 +103,10 @@ def get_hydraulic_conductivity(N, mean, std, bounds=[0, np.inf]):
     return K[:N]
 
 def get_scale_parameter(N, mean, std, bounds=[0, np.inf]):
+    """
+    Return a list of normaly distributed scale parameters (hg) in m. Bounds on
+    the distribution can be imposed.
+    """
 
     larger_N = 2 * N
     while True:
@@ -110,6 +123,10 @@ def get_scale_parameter(N, mean, std, bounds=[0, np.inf]):
     return hg[:N]
 
 def get_shape_parameter(N, mean, std, bounds=[1, np.inf]):
+    """
+    Return a list of normaly distributed shape parameters (n). Bounds on the
+    distribution can be imposed.
+    """
 
     larger_N = 2 * N
     while True:
@@ -126,6 +143,11 @@ def get_shape_parameter(N, mean, std, bounds=[1, np.inf]):
     return n[:N]
 
 def sample_soils(name, N, bounds=None):
+    """
+    Return a dataframe with N values of hydraulic conductivity [m/s], scale [m]
+    and shape [-] parameters (from the vGM parametrization), generated according
+    to Rosetta3 and the given textural class.
+    """
 
     if bounds is None:
         bounds = {
@@ -144,73 +166,3 @@ def sample_soils(name, N, bounds=None):
                       columns=['K', 'hg', 'n'])
 
     return df
-
-# model 2 of Rosetta3
-
-# def sample_texture(N, texture_names):
-
-#     fractions = sample_texture_triangle(N, texture_names)
-#     df = sample_unsat_parameters(fractions)
-
-#     return df
-
-# def sample_texture_triangle(N, texture_names):
-#     """
-#     0=none
-#     1=clay
-#     2=silty clay
-#     3=silty clay loam
-#     4=sandy clay 
-#     5=sandy clay loam
-#     6=clay loam
-#     7=silt
-#     8=silt loam
-#     9=loam
-#     10=sand 
-#     11=loamy sand
-#     12=sandy loam
-#     13=silt loam
-#     """
-
-#     fractions = np.zeros((1, 3))
-
-#     while True:
-#         sand_frac = np.random.uniform(low=0, high=100, size=N)
-#         clay_frac = np.random.uniform(low=0, high=100, size=N)
-
-#         textures = getTextures(sand_frac, clay_frac, classification='USDA')
-    
-#         idx = np.zeros(N, dtype=bool)
-#         for name in texture_names:
-#             idx = np.logical_or(idx, np.array(textures) == name)
-
-#         if idx.sum() == 0: continue
-
-#         new_fractions = np.array([
-#                 sand_frac[idx],
-#                 100 - sand_frac[idx] - clay_frac[idx],
-#                 clay_frac[idx]
-#             ]).T
-#         fractions = np.append(fractions, new_fractions, axis=0)
-        
-#         if len(fractions) > N: break
-
-#     fractions = np.delete(fractions, 0, axis=0)
-
-#     return fractions
-
-# def sample_unsat_parameters(fractions):
-
-#     df = pd.DataFrame(index=range(len(fractions)), columns=['K', 'hg', 'n'])
-
-#     rose32 = Rosetta(rosetta_version=3, model_code=2)
-#     x = rose32.ann_predict(fractions, sum_data=False)['res'][0]
-
-#     idx = np.random.randint(0, high=1000, size=len(fractions))
-#     for i, idx_i in enumerate(idx):
-#         K = 1e-2 / (24 * 60 * 60) * 10**x[idx_i, 4, i].flatten()
-#         hg = 1e-2 / 10**x[idx_i, 2, i].flatten()
-#         n = 10**x[idx_i, 3, i].flatten()
-#         df.loc[i] = [K, hg, n]
-
-#     return df
