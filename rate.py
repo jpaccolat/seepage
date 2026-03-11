@@ -197,9 +197,10 @@ def q_approx_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
 
 def Phi(psi, psi_g, n):
     m = 1 - 1/n
-    u = (psi / psi_g)**n
-    f = 1 - u * (1 + u)**(-m)
-    return (n * u / (1 + u)) * (m/2 + 2 * (1 + u)**(-m) * (1 + (1 - m) * u) / f)
+    x = (psi / psi_g)**n
+    A = 1 / (1 + x)
+    B = x * A
+    return m * n * B * (0.5 + 2 * B**(m-1) * A / (1 - B**m))
 
 def q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     """
@@ -262,7 +263,7 @@ def q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
     s = 1 / (1 + (x_sh**0.5 / x)**a_nsh)
     q0 = q0_ns**(1-s) * q0_sh**s
 
-    return np.max([q0, cl_cond], axis=0)
+    return np.max([q0, 1.00001 * cl_cond], axis=0)
 
 def q_approx_full_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     """

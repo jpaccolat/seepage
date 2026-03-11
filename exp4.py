@@ -173,7 +173,7 @@ def run(args):
 
 def main():
 
-    parser = argparse.ArgumentParser(prog='exp5', description='')
+    parser = argparse.ArgumentParser(prog='exp4', description='')
     parser.add_argument('--aq_para', type=str, required=True,
                         help='vGM or BCB')
     parser.add_argument('--texture', type=str, required=True,
