@@ -195,6 +195,12 @@ def q_approx_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
         
     return q
 
+def Phi(psi, psi_g, n):
+    m = 1 - 1/n
+    u = (psi / psi_g)**n
+    f = 1 - u * (1 + u)**(-m)
+    return (n * u / (1 + u)) * (m/2 + 2 * (1 + u)**(-m) * (1 + (1 - m) * u) / f)
+
 def q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     """
     Approximate seepage at full disconnection for the vGM parametrization.
@@ -202,14 +208,33 @@ def q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     
     q0 = q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
 
-    b = 0.5 * (5 * aq_shape - 1)
     hc = cl_th * (aq_cond / cl_cond - 1)
-    x = np.min([0.99 * aq_cond, (1 + b) * q0], axis=0)
-    s = -cl_cond / cl_th * (q0 - cl_cond) / (x - cl_cond)
+    psi = cl_th * (q0 / cl_cond - 1)
+    b = Phi(psi, aq_scale, aq_shape)
+    s = -cl_cond / cl_th * (q0 - cl_cond + 1e-20) / ((1 + b) * q0 - cl_cond + 1e-20)
     hstar =  (q0 - cl_cond) / (s * hc + q0 - cl_cond) * hc
-    q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
+    q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar + 1e-20)) * stage
 
     return q
+
+
+# def q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
+#     """
+#     Approximate seepage at full disconnection for the vGM parametrization.
+#     """
+    
+#     q0 = q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
+
+#     b = 0.5 * (5 * aq_shape - 1)
+#     hc = cl_th * (aq_cond / cl_cond - 1)
+#     x = np.min([0.99 * aq_cond, (1 + b) * q0], axis=0)
+#     s = -cl_cond / cl_th * (q0 - cl_cond) / (x - cl_cond)
+#     hstar =  (q0 - cl_cond) / (s * hc + q0 - cl_cond) * hc
+#     q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
+
+#     print(hstar)
+
+#     return q
 
 def q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape, 
                        C_NS_1=-0.3850, C_NS_2=0.2056, C_NS_3=0.5818,
@@ -237,7 +262,7 @@ def q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
     s = 1 / (1 + (x_sh**0.5 / x)**a_nsh)
     q0 = q0_ns**(1-s) * q0_sh**s
 
-    return q0
+    return np.max([q0, cl_cond], axis=0)
 
 def q_approx_full_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     """
@@ -272,9 +297,7 @@ def q0_approx_full_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
     a_sh = C_SH_1 + C_SH_2 * xi
     q0_sh = q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh)
 
-    q0 = np.min([aq_cond, q0_sh], axis=0)
-
-    return q0
+    return np.min([aq_cond, q0_sh], axis=0)
 
 def q0_negl_to_soft(aq_cond, x, xi, a_ns):
     """Transition equation from negligible to soft"""
