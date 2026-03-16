@@ -66,7 +66,7 @@ def draw_samples(args, N):
         'n': [args.nmin, np.inf]
     }
 
-    aq = rose.sample_soils(args.texture, N, bounds=bounds)
+    aq = rose.sample_from_class(args.texture, N, bounds=bounds)
     aq_cond = aq['K'].values
     aq_scale = aq['hg'].values
     aq_shape = aq['n'].values
