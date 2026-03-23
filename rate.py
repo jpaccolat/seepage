@@ -212,9 +212,9 @@ def q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     hc = cl_th * (aq_cond / cl_cond - 1)
     psi = cl_th * (q0 / cl_cond - 1)
     b = Phi(psi, aq_scale, aq_shape)
-    s = -cl_cond / cl_th * (q0 - cl_cond + 1e-20) / ((1 + b) * q0 - cl_cond + 1e-20)
+    s = -cl_cond / cl_th * (q0 - cl_cond) / ((1 + b) * q0 - cl_cond)
     hstar =  (q0 - cl_cond) / (s * hc + q0 - cl_cond) * hc
-    q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar + 1e-20)) * stage
+    q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
 
     return q
 

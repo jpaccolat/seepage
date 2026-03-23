@@ -51,7 +51,7 @@ def sample_from_class(name, N, bounds=None):
 
     return df
 
-def sample_from_fraction(N: int, sand: tuple, silt: function, n=20):
+def sample_from_fraction(sand: tuple, silt: function, N: int, n=20):
     """
     Return a dataframe with N values of hydraulic conductivity [m/s], scale [m]
     and shape [-] parameters (from the vGM parametrization), generated according
@@ -64,12 +64,12 @@ def sample_from_fraction(N: int, sand: tuple, silt: function, n=20):
 
     Parameters:
     -----------
-    N: int
-        Sample size
     sand: int or tuple
         Sand fraction, or min and max sand fractions.
     silt: function
         Function returning silt fraction from sand fraction.
+    N: int
+        Sample size
     n: int
         Number of sample drawn per sand fraction. Must divide N.
     """
@@ -156,6 +156,13 @@ def get_gaussian_parameters(name):
             'K': [1.641, 0.27],
             'alpha': [-2.182, 0.30],
             'n': [0.225, 0.13]
+        }
+
+    if name == 'SILT_CLAY':
+        p = {
+            'K': [0.983, 0.57],
+            'alpha': [-1.790, 0.64],
+            'n': [0.121, 0.10]
         }
 
 
