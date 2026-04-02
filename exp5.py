@@ -27,6 +27,7 @@ warnings.filterwarnings('ignore')
 # Third party imports
 import numpy as np
 import pandas as pd
+from threadpoolctl import threadpool_limits
 from tqdm import tqdm
 
 # Internal imports
@@ -94,65 +95,66 @@ def run(args):
                                'ap full std', 'ex full mean', 'ex full std',
                                'ap mean', 'ap std', 'ex mean', 'ex std'])
     
-    # increase array size from base to base**n
-    # the computation time is averaged in a way that the total number of
-    # requests is independent on the array size
-    for i in tqdm(range(1, args.n+1)):
-        N = args.base**i
-        n_sample = 3 * args.base**(args.n-i)
-
-        dt_mf = []
-        dt_ap_full = []
-        dt_ex_full = []
-        dt_ap = []
-        for k in range(n_sample):
-            parameters = draw_samples(args, N)
-
-            t1 = perf_counter()
-            _ = q_modflow(*parameters[:3])
-            t2 = perf_counter()
-            _ = q_approx_full(*parameters[1:], args.aq_para)
-            t3 = perf_counter()
-            _ = q_exact_full(*parameters[1:], args.aq_para)
-            t4 = perf_counter()
-            _ = q_approx(*parameters, args.aq_para)
-            t5 = perf_counter()
-
-            dt_mf.append((t2 - t1) / N)
-            dt_ap_full.append((t3 - t2) / N)
-            dt_ex_full.append((t4 - t3) / N)
-            dt_ap.append((t5 - t4) / N)
-
-        df.loc[i, 'mf mean'] = np.mean(dt_mf)
-        df.loc[i, 'mf std'] = np.std(dt_mf)
-        df.loc[i, 'ap full mean'] = np.mean(dt_ap_full)
-        df.loc[i, 'ap full std'] = np.std(dt_ap_full)
-        df.loc[i, 'ex full mean'] = np.mean(dt_ex_full)
-        df.loc[i, 'ex full std'] = np.std(dt_ex_full)
-        df.loc[i, 'ap mean'] = np.mean(dt_ap)
-        df.loc[i, 'ap std'] = np.std(dt_ap)
-        df.loc[i, 'ex mean'] = np.nan
-        df.loc[i, 'ex std'] = np.nan
-
-    # measure computation time for the BVP (exact solution with finite water
-    # table depth), which is much larger.
-    if args.n_BVP > 0:
-        for i in tqdm(range(1, args.n_BVP+1)):
+    with threadpool_limits(limits=1, user_api="blas"):
+        # increase array size from base to base**n
+        # the computation time is averaged in a way that the total number of
+        # requests is independent on the array size
+        for i in tqdm(range(1, args.n+1)):
             N = args.base**i
-            n_sample = 3 * args.base**(args.n_BVP-i)
+            n_sample = 3 * args.base**(args.n-i)
 
-            dt_ex = []
+            dt_mf = []
+            dt_ap_full = []
+            dt_ex_full = []
+            dt_ap = []
             for k in range(n_sample):
                 parameters = draw_samples(args, N)
 
                 t1 = perf_counter()
-                _ = q_exact(*parameters, args.aq_para)
+                _ = q_modflow(*parameters[:3])
                 t2 = perf_counter()
+                _ = q_approx_full(*parameters[1:], args.aq_para)
+                t3 = perf_counter()
+                _ = q_exact_full(*parameters[1:], args.aq_para)
+                t4 = perf_counter()
+                _ = q_approx(*parameters, args.aq_para)
+                t5 = perf_counter()
 
-                dt_ex.append((t2 - t1) / N)
+                dt_mf.append((t2 - t1) / N)
+                dt_ap_full.append((t3 - t2) / N)
+                dt_ex_full.append((t4 - t3) / N)
+                dt_ap.append((t5 - t4) / N)
 
-            df.loc[i, 'ex mean'] = np.mean(dt_ex)
-            df.loc[i, 'ex std'] = np.std(dt_ex)
+            df.loc[i, 'mf mean'] = np.mean(dt_mf)
+            df.loc[i, 'mf std'] = np.std(dt_mf)
+            df.loc[i, 'ap full mean'] = np.mean(dt_ap_full)
+            df.loc[i, 'ap full std'] = np.std(dt_ap_full)
+            df.loc[i, 'ex full mean'] = np.mean(dt_ex_full)
+            df.loc[i, 'ex full std'] = np.std(dt_ex_full)
+            df.loc[i, 'ap mean'] = np.mean(dt_ap)
+            df.loc[i, 'ap std'] = np.std(dt_ap)
+            df.loc[i, 'ex mean'] = np.nan
+            df.loc[i, 'ex std'] = np.nan
+
+        # measure computation time for the BVP (exact solution with finite water
+        # table depth), which is much larger.
+        if args.n_BVP > 0:
+            for i in tqdm(range(1, args.n_BVP+1)):
+                N = args.base**i
+                n_sample = 3 * args.base**(args.n_BVP-i)
+
+                dt_ex = []
+                for k in range(n_sample):
+                    parameters = draw_samples(args, N)
+
+                    t1 = perf_counter()
+                    _ = q_exact(*parameters, args.aq_para)
+                    t2 = perf_counter()
+
+                    dt_ex.append((t2 - t1) / N)
+
+                df.loc[i, 'ex mean'] = np.mean(dt_ex)
+                df.loc[i, 'ex std'] = np.std(dt_ex)
 
     # save data
     df.to_csv(args.path / 'time.csv', sep=',', index=True, header=True)
@@ -178,7 +180,7 @@ def main():
 
     # set default output directory name
     if args.output is None:
-        args.output = f'exp6_{args.aq_para}_{args.texture}'
+        args.output = f'exp5_{args.aq_para}_{args.texture}'
 
     # handle output directory
     args.path = pathlib.Path(args.output)

@@ -196,7 +196,7 @@ def main():
 
     # set default output directory name
     if args.output is None:
-        args.output = f'exp5_{args.aq_para}_{args.texture}'
+        args.output = f'exp4_{args.aq_para}_{args.texture}'
 
     # handle output directory
     args.path = pathlib.Path(args.output)
