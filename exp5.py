@@ -31,11 +31,7 @@ from threadpoolctl import threadpool_limits
 from tqdm import tqdm
 
 # Internal imports
-from rate import q_exact
-from rate import q_approx
-from rate import q_exact_full
-from rate import q_approx_full
-from rate import q_modflow
+import rate
 import rose
 
 ####################
@@ -90,11 +86,14 @@ def draw_samples(args, N):
 def run(args):
     """Run experiment 4."""
 
-    # init dataframe
-    df = pd.DataFrame(columns=['mf mean', 'mf std', 'ap full mean',
-                               'ap full std', 'ex full mean', 'ex full std',
-                               'ap mean', 'ap std', 'ex mean', 'ex std'])
+    # init dataframes
+    columns = ['mf', 'ap full st', 'ap full', 'ap st', 'ap', 'ex full']
+    abs_m = pd.DataFrame(columns=columns)
+    abs_s = pd.DataFrame(columns=columns)
+    rel_m = pd.DataFrame(columns=columns)
+    rel_s = pd.DataFrame(columns=columns)
     
+    # set BLAS thread = 1 for benchmarking
     with threadpool_limits(limits=1, user_api="blas"):
         # increase array size from base to base**n
         # the computation time is averaged in a way that the total number of
@@ -103,62 +102,60 @@ def run(args):
             N = args.base**i
             n_sample = 3 * args.base**(args.n-i)
 
-            dt_mf = []
-            dt_ap_full = []
-            dt_ex_full = []
-            dt_ap = []
+            dt = {
+                'mf': [],
+                'ap full st': [],
+                'ap full': [],
+                'ap st': [],
+                'ap': [],
+                'ex full': []
+            }
             for k in range(n_sample):
-                parameters = draw_samples(args, N)
+                p = draw_samples(args, N)
+
+                if args.aq_para == 'vGM':
+                    statics = rate.get_statics_vGM(*p[2:])
+                else:
+                    statics = rate.get_statics_BCB(*p[2:])
 
                 t1 = perf_counter()
-                _ = q_modflow(*parameters[:3])
+                _ = rate.q_modflow(*p[:3])
                 t2 = perf_counter()
-                _ = q_approx_full(*parameters[1:], args.aq_para)
+                _ = rate.q_approx_full(*p[1:4], statics=statics)
                 t3 = perf_counter()
-                _ = q_exact_full(*parameters[1:], args.aq_para)
+                _ = rate.q_approx_full(*p[1:4], aq_cond=p[4], aq_scale=p[5],
+                                       aq_shape=p[6], aq_para=args.aq_para)
                 t4 = perf_counter()
-                _ = q_approx(*parameters, args.aq_para)
+                _ = rate.q_approx(*p[:5], statics=statics)
                 t5 = perf_counter()
+                _ = rate.q_approx(*p[:5], aq_scale=p[5], aq_shape=p[6],
+                                  aq_para=args.aq_para)
+                t6 = perf_counter()
+                _ = rate.q_exact_full(*p[1:], args.aq_para)
+                t7 = perf_counter()
 
-                dt_mf.append((t2 - t1) / N)
-                dt_ap_full.append((t3 - t2) / N)
-                dt_ex_full.append((t4 - t3) / N)
-                dt_ap.append((t5 - t4) / N)
+                dt['mf'].append(t2 - t1)
+                dt['ap full st'].append(t3 - t2)
+                dt['ap full'].append(t4 - t3)
+                dt['ap st'].append(t5 - t4)
+                dt['ap'].append(t6 - t5)
+                dt['ex full'].append(t7 - t6)
 
-            df.loc[i, 'mf mean'] = np.mean(dt_mf)
-            df.loc[i, 'mf std'] = np.std(dt_mf)
-            df.loc[i, 'ap full mean'] = np.mean(dt_ap_full)
-            df.loc[i, 'ap full std'] = np.std(dt_ap_full)
-            df.loc[i, 'ex full mean'] = np.mean(dt_ex_full)
-            df.loc[i, 'ex full std'] = np.std(dt_ex_full)
-            df.loc[i, 'ap mean'] = np.mean(dt_ap)
-            df.loc[i, 'ap std'] = np.std(dt_ap)
-            df.loc[i, 'ex mean'] = np.nan
-            df.loc[i, 'ex std'] = np.nan
+            for key in columns:
+                dt[key] = np.array(dt[key])
 
-        # measure computation time for the BVP (exact solution with finite water
-        # table depth), which is much larger.
-        if args.n_BVP > 0:
-            for i in tqdm(range(1, args.n_BVP+1)):
-                N = args.base**i
-                n_sample = 3 * args.base**(args.n_BVP-i)
-
-                dt_ex = []
-                for k in range(n_sample):
-                    parameters = draw_samples(args, N)
-
-                    t1 = perf_counter()
-                    _ = q_exact(*parameters, args.aq_para)
-                    t2 = perf_counter()
-
-                    dt_ex.append((t2 - t1) / N)
-
-                df.loc[i, 'ex mean'] = np.mean(dt_ex)
-                df.loc[i, 'ex std'] = np.std(dt_ex)
+            for key in columns:
+                abs_m.loc[i, key] = np.mean(dt[key])
+                abs_s.loc[i, key] = np.std(dt[key])
+                rel_m.loc[i, key] = np.mean(dt[key] / dt['ex full'])
+                rel_s.loc[i, key] = np.std(dt[key] / dt['ex full'])
 
     # save data
-    df.to_csv(args.path / 'time.csv', sep=',', index=True, header=True)
-    print(f'Data stored in {args.path / 'time.csv'}')
+    abs_m.to_csv(args.path / 'abs_m.csv', sep=',', index=True, header=True)
+    abs_s.to_csv(args.path / 'abs_s.csv', sep=',', index=True, header=True)
+    rel_m.to_csv(args.path / 'rel_m.csv', sep=',', index=True, header=True)
+    rel_s.to_csv(args.path / 'rel_s.csv', sep=',', index=True, header=True)
+    print(f'Data stored in {args.path}')
 
 def main():
 
@@ -169,9 +166,8 @@ def main():
                         help='SAND or SAND_LOAM')
     parser.add_argument('--nmin', type=float, default=1.1,
                         help='Minimal value of the vGM shape parameter')
-    parser.add_argument('--base', type=int, default=3)
+    parser.add_argument('--base', type=int, default=5)
     parser.add_argument('--n', type=int, default=8)
-    parser.add_argument('--n_BVP', type=int, default=0)
     parser.add_argument('--output', type=str, default=None,
                         help='Path to directory')
     parser.add_argument('--clean', default=False, const=True, nargs='?',

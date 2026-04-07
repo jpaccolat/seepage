@@ -23,8 +23,7 @@ from uhc import get_rhc
 # Functions #
 #############
 
-def q_exact(depth: float, stage: float, cl_cond: float, cl_th: float,
-            aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str,
+def q_exact(depth, stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para,
             guess=0., max_nodes=1000, tol=1e-3):
     """
     Exact seepage through a clogging layer with a shallow water table.
@@ -82,8 +81,7 @@ def q_exact(depth: float, stage: float, cl_cond: float, cl_th: float,
     return sol.p[0]
 q_exact = np.vectorize(q_exact)
 
-def q_exact_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
-             aq_scale: float, aq_shape: float, aq_para: str):
+def q_exact_full(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para):
     """
     Exact seepage through a clogging layer at full disconnection.
 
@@ -125,8 +123,8 @@ def q_exact_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
     return q
 q_exact_full = np.vectorize(q_exact_full)
 
-def q_approx(depth: float, stage: float, cl_cond: float, cl_th: float,
-             aq_cond: float, aq_scale: float, aq_shape: float, aq_para: str):
+def q_approx(depth, stage, cl_cond, cl_th, aq_cond, statics=None,
+             aq_scale=None, aq_shape=None, aq_para=None):
     """
     Approximate seepage through a clogging layer with a shallow water table.
 
@@ -152,16 +150,27 @@ def q_approx(depth: float, stage: float, cl_cond: float, cl_th: float,
         Name of the unsaturated parametrization of the underlying aquifer.
         Either vGM (van Genuchten - Mualem) or BCB (Brooks - Corey - Burdine).
     """
-    
+
+    # depth smaller than linear approx. of the capillary zone 
     q1 = (stage + cl_th + depth) / (cl_th / cl_cond + depth / aq_cond)
-    q2 = q_approx_full(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
-                       aq_para)
-    q = np.min([q1, q2], axis=0)
 
-    return q
+    # max value (at full disconnection)
+    if statics is not None:
+        pass
+    elif aq_para == 'vGM':
+        statics = get_statics_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
+    elif aq_para == 'BCB':
+        statics = get_statics_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
+    else:
+        print('Invalid input.')
 
-def q_approx_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
-                  aq_scale: float, aq_shape: float, aq_para: str):
+    q0, s, hstar = statics
+    q2 = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
+
+    return np.min([q1, q2], axis=0)
+
+def q_approx_full(stage, cl_cond, cl_th, statics=None, aq_cond=None,
+                  aq_scale=None, aq_shape=None, aq_para=None):
     """
     Approximate seepage through a clogging layer at full disconnection.
 
@@ -185,24 +194,22 @@ def q_approx_full(stage: float, cl_cond: float, cl_th: float, aq_cond: float,
         Name of the unsaturated parametrization of the underlying aquifer.
         Either vGM (van Genuchten - Mualem) or BCB (Brooks - Corey - Burdine).
     """
-    
-    if aq_para == 'vGM':
-        q = q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale,
-                              aq_shape)
+
+    if statics is not None:
+        pass
+    elif aq_para == 'vGM':
+        statics = get_statics_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
     elif aq_para == 'BCB':
-        q = q_approx_full_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale,
-                              aq_shape)
-        
+        statics = get_statics_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
+    else:
+        print('Invalid input.')
+
+    q0, s, hstar = statics
+    q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
+ 
     return q
 
-def Phi(psi, psi_g, n):
-    m = 1 - 1/n
-    x = (psi / psi_g)**n
-    A = 1 / (1 + x)
-    B = x * A
-    return m * n * B * (0.5 + 2 * B**(m-1) * A / (1 - B**m))
-
-def q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
+def get_statics_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     """
     Approximate seepage at full disconnection for the vGM parametrization.
     """
@@ -211,31 +218,18 @@ def q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
 
     hc = cl_th * (aq_cond / cl_cond - 1)
     psi = cl_th * (q0 / cl_cond - 1)
-    b = Phi(psi, aq_scale, aq_shape)
-    s = -cl_cond / cl_th * (q0 - cl_cond) / ((1 + b) * q0 - cl_cond)
+    Phi = Phi_vGM(psi, aq_scale, aq_shape)
+    s = -cl_cond / cl_th * (q0 - cl_cond) / ((1 + Phi) * q0 - cl_cond)
     hstar =  (q0 - cl_cond) / (s * hc + q0 - cl_cond) * hc
-    q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
 
-    return q
-
-
-# def q_approx_full_vGM(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
-#     """
-#     Approximate seepage at full disconnection for the vGM parametrization.
-#     """
+    return q0, s, hstar
     
-#     q0 = q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
-
-#     b = 0.5 * (5 * aq_shape - 1)
-#     hc = cl_th * (aq_cond / cl_cond - 1)
-#     x = np.min([0.99 * aq_cond, (1 + b) * q0], axis=0)
-#     s = -cl_cond / cl_th * (q0 - cl_cond) / (x - cl_cond)
-#     hstar =  (q0 - cl_cond) / (s * hc + q0 - cl_cond) * hc
-#     q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
-
-#     print(hstar)
-
-#     return q
+def Phi_vGM(psi, hg, n):
+    m = 1 - 1/n
+    x = (psi / hg)**n
+    A = 1 / (1 + x)
+    B = x * A
+    return m * n * B * (0.5 + 2 * B**(m-1) * A / (1 - B**m))
 
 def q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape, 
                        C_NS_1=-0.3850, C_NS_2=0.2056, C_NS_3=0.5818,
@@ -265,21 +259,20 @@ def q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
 
     return np.max([q0, 1.00001 * cl_cond], axis=0)
 
-def q_approx_full_BCB(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
+def get_statics_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     """
     Approximate seepage at full disconnection for the BCB parametrization.
     """
 
     q0 = q0_approx_full_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
 
-    b = 2 + 3 * aq_shape
-    s = -cl_cond / cl_th * (q0 - cl_cond) / ((1+b) * q0 - cl_cond)
+    Phi = 2 + 3 * aq_shape
+    s = -cl_cond / cl_th * (q0 - cl_cond) / ((1 + Phi) * q0 - cl_cond)
     hc = cl_th * (aq_cond / cl_cond - 1) - aq_scale
     cl_cond_cor = cl_cond * (1 + aq_scale / cl_th) 
     hstar =  (q0 - cl_cond_cor) / (s * hc + q0 - cl_cond_cor) * hc
-    q = q0 + (cl_cond / cl_th - s * hstar / (stage - hstar)) * stage
-
-    return q
+  
+    return q0, s, hstar
 
 def q0_approx_full_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
                        C_SH_1=0.4633, C_SH_2=0.5396):
