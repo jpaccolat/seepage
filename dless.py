@@ -1,14 +1,7 @@
 #!/usr/bin/env python
 
-"""Some util functions."""
+"""Some util functions to convert parameters."""
 
-####################
-# Libraries        #
-####################
-
-# Standard imports
-import functools
-import time
 
 ####################
 # Functions        #
@@ -30,7 +23,7 @@ def get_generalized_shape_parameters(aq_shape, aq_para):
 
     return b, B
 
-def get_Dless_parameters(cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para):
+def get_dless_parameters(cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para):
     """
     Return all dimensionless parameters (b, B, xi, x and x_sh) associated to a
     given streambed profile.

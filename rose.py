@@ -3,10 +3,9 @@
 """
 Generate soil samples according to Rosetta3.
 
-For model 1, mean and standard deviations of the log of K, alpha and n are
-taken from https://www.ars.usda.gov/pacific-west-area/riverside-ca/agricultural-water-efficiency-and-salinity-research-unit/docs/model/rosetta-class-average-hydraulic-parameters/
+For model 1, mean and standard deviations of the log K, alpha and n are taken
+from https://www.ars.usda.gov/pacific-west-area/riverside-ca/agricultural-water-efficiency-and-salinity-research-unit/docs/model/rosetta-class-average-hydraulic-parameters/
 The distribution are assumed gaussian as argued in http://dx.doi.org/10.1016/j.jhydrol.2017.01.004
-
 
 For model 3 the rosetta-soil package is used.
 """
