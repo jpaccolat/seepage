@@ -23,6 +23,7 @@ Fits of a_ns(b) and a_sh(b) are given in the companion notebook.
 ####################
 
 # Standard imports
+import sys
 import pathlib
 import argparse
 import json
@@ -34,10 +35,10 @@ from scipy.optimize import least_squares
 from tqdm import tqdm
 
 # Internal imports
+sys.path.append('..')
 from rate import q_exact_full
 from rate import q0_negl_to_soft
 from rate import q0_soft_to_hard
-from rate import q0_approx_full_vGM
 
 ####################
 # Constants        #

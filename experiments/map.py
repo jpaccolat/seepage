@@ -9,6 +9,7 @@
 ####################
 
 # Standard imports
+import sys
 from math import isclose
 from time import time
 
@@ -22,9 +23,9 @@ from matplotlib.lines import Line2D
 from matplotlib.patches import Polygon, Patch
 
 # Internal imports
-# Internal imports
+sys.path.append('..')
 from rose import sample_from_class, sample_from_fraction
-from utils import get_Dless_parameters
+from dless import get_dless_parameters
 
 ####################
 # Constants        #
@@ -134,7 +135,7 @@ def get_region(sb, N=1000, n=20):
     
 
     # convert to infiltrability space
-    _, _, _, x, x_sh = get_Dless_parameters(cl_cond, cl_th, aq_cond, aq_scale,
+    _, _, _, x, x_sh = get_dless_parameters(cl_cond, cl_th, aq_cond, aq_scale,
                                             aq_shape, sb['aq_para'])
     points = np.array([np.log10(x), np.log10(x_sh)])
 
@@ -190,7 +191,7 @@ def get_points(sb):
         
     points = []
     for v in zip(cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
-        _, _, _, x, x_sh = get_Dless_parameters(*v, 'vGM')
+        _, _, _, x, x_sh = get_dless_parameters(*v, 'vGM')
         points.append([np.log10(x), np.log10(x_sh)])
     
     return np.array(points).T
@@ -252,6 +253,10 @@ def plot_streambed(x, ax, labels, color):
         labels.append(Patch(fc=color, ec='k', label=f'{r}{x['name']}'))
 
 def get_d60(K):
+    """
+    Get d60 fraction from hydraulic conductivity.
+    Expression from Peche2024 (10.1111/gwat.13365)
+    """
 
     Pi = 0.0009
     c1 = 1.2
@@ -278,6 +283,10 @@ def get_d60(K):
     return d60
 
 def get_alpha(K):
+    """
+    Get van Genuchten alpha from hydraulic conductivity.
+    Expression from Peche2024 (10.1111/gwat.13365)
+    """
 
     c1 = 1.803e-4
     c2 = 0.1
@@ -288,6 +297,10 @@ def get_alpha(K):
 get_alpha_v = np.vectorize(get_alpha)
 
 def get_n(alpha):
+    """
+    Get van Genuchten n from alpha.
+    Expression from Peche2024 (10.1111/gwat.13365)
+    """
 
     c3 = 1.124
     c4 = 0.557

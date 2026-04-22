@@ -13,6 +13,7 @@ a_nsh(b). The latter is discussed in the companion notebook.
 ####################
 
 # Standard imports
+import sys
 import pathlib
 import argparse
 import json
@@ -22,10 +23,11 @@ import numpy as np
 import pandas as pd
 
 # Internal imports
+sys.path.append('..')
 from rate import q_exact_full
 from rate import q0_negl_to_soft
 from rate import q0_soft_to_hard
-from utils import get_Dless_parameters
+from dless import get_dless_parameters
 
 ####################
 # Constants        #
@@ -150,7 +152,7 @@ def run(args):
 
     # append dataframe with dimensionless parameters
     df['x'] = x
-    df['b'], df['B'], df['xi'], _, df['xsh'] = get_Dless_parameters(
+    df['b'], df['B'], df['xi'], _, df['xsh'] = get_dless_parameters(
                                     df['cl_cond'], df['cl_th'], df['aq_cond'],
                                     df['aq_scale'], df['aq_shape'],
                                     args.aq_para

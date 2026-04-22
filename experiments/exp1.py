@@ -23,6 +23,7 @@ sl_it.csv
 ####################
 
 # Standard imports
+import sys
 import pathlib
 import argparse
 import json
@@ -35,11 +36,12 @@ from scipy.interpolate import interp1d
 from scipy.optimize import fsolve
 
 # Internal imports
+sys.path.append('..')
 from rate import q_exact_full
 from rate import q0_asymptote_negl
 from rate import q0_asymptote_soft
 from rate import q0_asymptote_hard
-from utils import get_Dless_parameters
+from dless import get_dless_parameters
 
 ####################
 # Constants        #
@@ -112,7 +114,7 @@ def compute_rates(args):
     df['aq_para'] = args.aq_para
 
     # append dataframe with dimensionless parameters
-    df['b'], df['B'], df['xi'], df['x'], df['xsh'] = get_Dless_parameters(
+    df['b'], df['B'], df['xi'], df['x'], df['xsh'] = get_dless_parameters(
                                     df['cl_cond'], df['cl_th'], df['aq_cond'],
                                     df['aq_scale'], df['aq_shape'],
                                     args.aq_para

@@ -18,6 +18,7 @@ n_BVP. If the latter is not specified, this solution is discarded.
 ####################
 
 # Standard imports
+import sys
 import pathlib
 import argparse
 from time import perf_counter
@@ -31,6 +32,7 @@ from threadpoolctl import threadpool_limits
 from tqdm import tqdm
 
 # Internal imports
+sys.path.append('..')
 import rate
 import rose
 

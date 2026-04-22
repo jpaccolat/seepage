@@ -22,6 +22,7 @@ conductivity is drawn from a log-uniform distribution.
 ####################
 
 # Standard imports
+import sys
 import pathlib
 import argparse
 
@@ -34,6 +35,7 @@ import pandas as pd
 from tqdm import tqdm
 
 # Internal imports
+sys.path.append('..')
 from rate import q_exact
 from rate import q_approx
 from rate import q_exact_full
