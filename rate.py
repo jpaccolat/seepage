@@ -2,7 +2,7 @@
 
 """Seepage rate formulas.
 
-All exact and approximate formulas to compute seepage are listed here.
+Exact and approximate formulas to compute seepage from a disconnected stream.
 """
 
 ####################
@@ -28,7 +28,8 @@ def q_exact(depth, stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para,
     """
     Exact seepage through a clogging layer with a shallow water table.
 
-    Solve the steady state Richard's equation for given boundary conditions.
+    Solve the steady state Richard's equation for given boundary conditions,
+    i.e., stream stage and water table depth.
 
     Parameters
     ----------
@@ -50,7 +51,7 @@ def q_exact(depth, stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para,
         aquifer [-].
     aq_para: str
         Name of the unsaturated parametrization of the underlying aquifer.
-        Either vGM (van Genuchten - Mualem) or BCB (Brooks - Corey - Burdine).
+        Either vGM (van Genuchten-Mualem) or BCB (Brooks-Corey-Burdine).
     guess: float, optional
         Initial guess of seepage rate. Default is 0.
     max_nodes: int, optional
@@ -105,7 +106,7 @@ def q_exact_full(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para):
         aquifer [-].
     aq_para: str
         Name of the unsaturated parametrization of the underlying aquifer.
-        Either vGM (van Genuchten - Mualem) or BCB (Brooks - Corey - Burdine).
+        Either vGM (van Genuchten-Mualem) or BCB (Brooks-Corey-Burdine).
     """
     
     rhc = get_rhc(aq_para)
@@ -122,6 +123,24 @@ def q_exact_full(stage, cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para):
 
     return q
 q_exact_full = np.vectorize(q_exact_full)
+
+def q_modflow(stage, cl_cond, cl_th):
+    """
+    MODFLOW approximate formula of disconnected seepage.
+
+    Parameters
+    ----------
+    stage: float
+        Water depth in the stream [m].
+    cl_cond: float
+        Hydraulic conductivity of the clogging layer [m/s].
+    cl_th: float
+        Thickness of the clogging layer [m].
+    """
+
+    q = cl_cond * (1 + stage / cl_th)
+
+    return q
 
 def q_approx(depth, stage, cl_cond, cl_th, aq_cond, statics=None,
              aq_scale=None, aq_shape=None, aq_para=None):
@@ -140,6 +159,9 @@ def q_approx(depth, stage, cl_cond, cl_th, aq_cond, statics=None,
         Thickness of the clogging layer [m].
     aq_cond: float
         Hydraulic conductivity of the underlying aquifer [m/s].
+    statics: None or tuple
+        If None, the static parameters, q0, s and hstar are computed. Else, they
+        must be provided in order, which speeds up computation.
     aq_scale: float
         Scale parameter of the unsaturated parametrization of the underlying
         aquifer [m].
@@ -148,7 +170,7 @@ def q_approx(depth, stage, cl_cond, cl_th, aq_cond, statics=None,
         aquifer [-].
     aq_para: str
         Name of the unsaturated parametrization of the underlying aquifer.
-        Either vGM (van Genuchten - Mualem) or BCB (Brooks - Corey - Burdine).
+        Either vGM (van Genuchten-Mualem) or BCB (Brooks-Corey-Burdine).
     """
 
     # depth smaller than linear approx. of the capillary zone 
@@ -182,6 +204,9 @@ def q_approx_full(stage, cl_cond, cl_th, statics=None, aq_cond=None,
         Hydraulic conductivity of the clogging layer [m/s].
     cl_th: float
         Thickness of the clogging layer [m].
+    statics: None or tuple
+        If None, the static parameters, q0, s and hstar are computed. Else, they
+        must be provided in order to speed up computation.
     aq_cond: float
         Hydraulic conductivity of the underlying aquifer [m/s].
     aq_scale: float
@@ -192,7 +217,7 @@ def q_approx_full(stage, cl_cond, cl_th, statics=None, aq_cond=None,
         aquifer [-].
     aq_para: str
         Name of the unsaturated parametrization of the underlying aquifer.
-        Either vGM (van Genuchten - Mualem) or BCB (Brooks - Corey - Burdine).
+        Either vGM (van Genuchten-Mualem) or BCB (Brooks-Corey-Burdine).
     """
 
     if statics is not None:
@@ -211,7 +236,8 @@ def q_approx_full(stage, cl_cond, cl_th, statics=None, aq_cond=None,
 
 def get_statics_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     """
-    Approximate seepage at full disconnection for the vGM parametrization.
+    Compute the static parameters q0, s and hstar according to the vGM
+    parametrization.
     """
     
     q0 = q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
@@ -225,6 +251,11 @@ def get_statics_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     return q0, s, hstar
     
 def Phi_vGM(psi, hg, n):
+    """
+    Compute the dimensionless logarithmic sensitivity at psi=psi0 for the vGM
+    parametrization.
+    """
+
     m = 1 - 1/n
     x = (psi / hg)**n
     A = 1 / (1 + x)
@@ -261,7 +292,8 @@ def q0_approx_full_vGM(cl_cond, cl_th, aq_cond, aq_scale, aq_shape,
 
 def get_statics_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape):
     """
-    Approximate seepage at full disconnection for the BCB parametrization.
+    Compute the static parameters q0, s and hstar according to the vGM
+    parametrization.
     """
 
     q0 = q0_approx_full_BCB(cl_cond, cl_th, aq_cond, aq_scale, aq_shape)
@@ -301,52 +333,26 @@ def q0_soft_to_hard(cl_cond, x, x_sh, xi, a_sh):
     """Transition equation from soft to hard"""
     return cl_cond * (1 + (x_sh / x)**a_sh)**(xi / a_sh)
 
-def q_modflow(stage: float, cl_cond: float, cl_th: float):
-    """
-    Approximate seepage through a clogging layer at full disconnection according
-    to MODFLOW
-
-    Parameters
-    ----------
-    stage: float
-        Water depth in the stream [m].
-    cl_cond: float
-        Hydraulic conductivity of the clogging layer [m/s].
-    cl_th: float
-        Thickness of the clogging layer [m].
-    """
-
-    q = cl_cond * (1 + stage / cl_th)
-
-    return q
-
-def q0_asymptote_negl(cl_cond: float,  cl_th: float, aq_cond: float,
-             aq_scale: float, aq_shape: float, aq_para: str):
+def q0_asymptote_negl(cl_cond,  cl_th, aq_cond, aq_scale, aq_shape, aq_para):
     """Negligible asymptotic solution"""
     q0 = aq_cond
-
     return q0
 
-def q0_asymptote_soft(cl_cond: float, cl_th: float, aq_cond: float,
-             aq_scale: float, aq_shape: float, aq_para: str):
+def q0_asymptote_soft(cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para):
     """Soft asymptotic solution"""
-    
+
     if aq_para == 'vGM':
         b = 0.5 * (5 * aq_shape - 1)
         B = (1 - 1 / aq_shape)**2
     elif aq_para == 'BCB':
         b = 2 + 3 * aq_shape
         B = 1
-
     x = B**(-1/b) * cl_th * aq_cond / (aq_scale * cl_cond)
     q0 = aq_cond * x**-(b/(1+b))
     
     return q0
 
-def q0_asymptote_hard(cl_cond: float, cl_th: float, aq_cond: float,
-             aq_scale: float, aq_shape: float, aq_para: str):
+def q0_asymptote_hard(cl_cond, cl_th, aq_cond, aq_scale, aq_shape, aq_para):
     """Hard asymptotic solution"""
-    
     q0 = cl_cond
-    
     return q0
