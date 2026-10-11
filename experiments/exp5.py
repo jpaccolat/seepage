@@ -21,7 +21,7 @@ n_BVP. If the latter is not specified, this solution is discarded.
 import sys
 import pathlib
 import argparse
-from time import perf_counter
+from time import process_time
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -73,7 +73,7 @@ def draw_samples(args, N):
     if args.aq_para == 'BCB':
         b = 0.5 * (5 * aq_shape - 1)
         B = (1 - 1 / aq_shape)**2
-        aq_scale *= B**(1/b)
+        aq_scale = aq_scale * B**(1/b)
         aq_shape = (b - 2) / 3
     else: assert args.aq_para == 'vGM', 'Bad parametrization. Use vGM or BCB.'
 
@@ -120,21 +120,21 @@ def run(args):
                 else:
                     statics = rate.get_statics_BCB(*p[2:])
 
-                t1 = perf_counter()
+                t1 = process_time()
                 _ = rate.q_modflow(*p[:3])
-                t2 = perf_counter()
+                t2 = process_time()
                 _ = rate.q_approx_full(*p[1:4], statics=statics)
-                t3 = perf_counter()
+                t3 = process_time()
                 _ = rate.q_approx_full(*p[1:4], aq_cond=p[4], aq_scale=p[5],
                                        aq_shape=p[6], aq_para=args.aq_para)
-                t4 = perf_counter()
+                t4 = process_time()
                 _ = rate.q_approx(*p[:5], statics=statics)
-                t5 = perf_counter()
+                t5 = process_time()
                 _ = rate.q_approx(*p[:5], aq_scale=p[5], aq_shape=p[6],
                                   aq_para=args.aq_para)
-                t6 = perf_counter()
+                t6 = process_time()
                 _ = rate.q_exact_full(*p[1:], args.aq_para)
-                t7 = perf_counter()
+                t7 = process_time()
 
                 dt['mf'].append(t2 - t1)
                 dt['ap full st'].append(t3 - t2)
