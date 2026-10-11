@@ -3,6 +3,7 @@ __pycache__/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+experiments/exp4_EGU.ipynb
 
 # output folders
 data/
